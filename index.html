@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Story Extractor - JSON Parser</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Georgia', serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+            color: #2d3748;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            font-weight: 300;
+            letter-spacing: 2px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .content {
+            padding: 2rem;
+        }
+
+        .upload-section {
+            border: 3px dashed #cbd5e0;
+            border-radius: 12px;
+            padding: 3rem;
+            text-align: center;
+            background: #f3e8ff;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .upload-section:hover {
+            border-color: #667eea;
+            background: #ede9fe;
+        }
+
+        .upload-section.dragover {
+            border-color: #667eea;
+            background: #e6fffa;
+            transform: scale(1.02);
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .upload-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.6;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'Georgia', serif;
+            margin: 0.5rem;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #f3e8ff 0%, #ede9fe 100%);
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid #e9d5ff;
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: #718096;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .results {
+            margin-top: 2rem;
+        }
+
+        .turn-item {
+            background: #f3e8ff;
+            border-left: 4px solid #667eea;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .turn-item:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transform: translateX(4px);
+        }
+
+        .turn-header {
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .turn-number {
+            background: #667eea;
+            color: white;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .turn-number:hover {
+            background: #764ba2;
+            transform: scale(1.05);
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #4a5568;
+            margin: 1rem 0 0.5rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .user-prompt, .model-response {
+            background: white;
+            padding: 1rem;
+            border-radius: 6px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            border: 1px solid #e2e8f0;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            display: none;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .export-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin: 2rem 0;
+            flex-wrap: wrap;
+        }
+
+        .filters {
+            background: #ede9fe;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+        }
+
+        .filter-row {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .filter-row label {
+            font-weight: bold;
+            color: #4a5568;
+        }
+
+        .filter-row input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .response-multiple {
+            margin-top: 0.5rem;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📖 Story Extractor</h1>
+            <p>Extract user prompts and model responses from your JSON conversations</p>
+            <p style="font-size: 0.9rem; margin-top: 0.5rem; opacity: 0.8;">Supports both Claude official format and Claude Exporter format</p>
+        </div>
+
+        <div class="content">
+            <div class="upload-section" id="uploadSection">
+                <div class="upload-icon">📁</div>
+                <h2>Drop your JSON file here</h2>
+                <p style="margin: 1rem 0; color: #718096;">or</p>
+                <input type="file" id="fileInput" accept=".json">
+                <label for="fileInput" class="btn">Choose File</label>
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Processing your conversation...</p>
+            </div>
+
+            <div id="statsSection" style="display: none;">
+                <div class="stats">
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalTurns">0</div>
+                        <div class="stat-label">Total Turns</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalTokens">0</div>
+                        <div class="stat-label">Token Count</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="conversationTitle">-</div>
+                        <div class="stat-label">Conversation</div>
+                    </div>
+                </div>
+
+                <div class="filters">
+                    <div class="filter-row">
+                        <label>
+                            <input type="checkbox" id="showPrompts" checked> Show Riv
+                        </label>
+                        <label>
+                            <input type="checkbox" id="showResponses" checked> Show Gale
+                        </label>
+                    </div>
+                    <div class="filter-row" style="margin-top: 1rem;">
+                        <label style="margin-right: 0.5rem;">Jump to Turn:</label>
+                        <input type="number" id="jumpToTurn" min="1" placeholder="Enter turn number" style="padding: 0.5rem; border: 1px solid #cbd5e0; border-radius: 4px; width: 150px;">
+                        <button class="btn" onclick="jumpToTurn()" style="padding: 0.5rem 1rem; margin: 0 0 0 0.5rem;">Go</button>
+                    </div>
+                </div>
+
+                <div class="export-buttons">
+                    <button class="btn" onclick="exportAsText()">📄 Export as Text</button>
+                    <button class="btn" onclick="exportAsJSON()">💾 Export as JSON</button>
+                    <button class="btn" onclick="copyToClipboard()">📋 Copy All to Clipboard</button>
+                </div>
+            </div>
+
+            <div class="results" id="results"></div>
+        </div>
+    </div>
+
+    <script>
+        let conversationData = null;
+
+        const uploadSection = document.getElementById('uploadSection');
+        const fileInput = document.getElementById('fileInput');
+        const loading = document.getElementById('loading');
+        const statsSection = document.getElementById('statsSection');
+        const results = document.getElementById('results');
+
+        // Drag and drop handlers
+        uploadSection.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadSection.classList.add('dragover');
+        });
+
+        uploadSection.addEventListener('dragleave', () => {
+            uploadSection.classList.remove('dragover');
+        });
+
+        uploadSection.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type === 'application/json') {
+                handleFile(file);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        });
+
+        // Filter handlers
+        document.getElementById('showPrompts').addEventListener('change', renderResults);
+        document.getElementById('showResponses').addEventListener('change', renderResults);
+
+        function handleFile(file) {
+            loading.classList.add('active');
+            uploadSection.style.display = 'none';
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const rawData = JSON.parse(e.target.result);
+                    conversationData = normalizeFormat(rawData);
+                    displayResults();
+                    loading.classList.remove('active');
+                    statsSection.style.display = 'block';
+                } catch (error) {
+                    alert('Error parsing JSON file: ' + error.message);
+                    loading.classList.remove('active');
+                    uploadSection.style.display = 'block';
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function normalizeFormat(data) {
+            // Detect format and normalize to standard structure
+            
+            // Format 1: Official Claude format (has "turns" array)
+            if (data.turns && Array.isArray(data.turns)) {
+                return data;
+            }
+            
+            // Format 2: Claude Exporter format (has "messages" array with role/say)
+            if (data.messages && Array.isArray(data.messages)) {
+                return {
+                    conversation: {
+                        title: data.metadata?.title || 'Untitled',
+                        creation_timestamp: new Date(data.metadata?.dates?.created).getTime() / 1000 || 0,
+                        update_timestamp: new Date(data.metadata?.dates?.updated).getTime() / 1000 || 0,
+                        token_count: 'N/A'
+                    },
+                    turns: convertMessagesToTurns(data.messages)
+                };
+            }
+            
+            // Unknown format
+            throw new Error('Unrecognized JSON format. Expected either Claude official format or Claude Exporter format.');
+        }
+
+        function convertMessagesToTurns(messages) {
+            const turns = [];
+            let currentTurn = null;
+            
+            messages.forEach((msg, index) => {
+                if (msg.role === 'Prompt') {
+                    // Start a new turn with user prompt
+                    currentTurn = {
+                        conversation_id: '',
+                        creation_timestamp: index,
+                        user_id: '',
+                        user_prompt: msg.say,
+                        model_responses: [],
+                        model_thoughts: [],
+                        update_timestamp: index,
+                        attachments: []
+                    };
+                } else if (msg.role === 'Response' && currentTurn) {
+                    // Add response to current turn
+                    // Remove "Thought:" prefix if present
+                    let responseText = msg.say;
+                    if (responseText.includes('Thought:')) {
+                        // Extract just the response part after thought
+                        const parts = responseText.split('\n\n\n');
+                        responseText = parts.slice(1).join('\n\n\n').trim();
+                    }
+                    currentTurn.model_responses.push(responseText);
+                    turns.push(currentTurn);
+                    currentTurn = null;
+                }
+            });
+            
+            // Handle case where last turn doesn't have a response
+            if (currentTurn) {
+                turns.push(currentTurn);
+            }
+            
+            return turns;
+        }
+
+        function displayResults() {
+            const turns = conversationData.turns || [];
+            const conversation = conversationData.conversation || {};
+
+            // Update stats
+            document.getElementById('totalTurns').textContent = turns.length;
+            const tokenCount = conversation.token_count;
+            document.getElementById('totalTokens').textContent = tokenCount === 'N/A' ? 'N/A' : parseInt(tokenCount || 0).toLocaleString();
+            document.getElementById('conversationTitle').textContent = conversation.title || 'Untitled';
+
+            renderResults();
+        }
+
+        function renderResults() {
+            const showPrompts = document.getElementById('showPrompts').checked;
+            const showResponses = document.getElementById('showResponses').checked;
+            const turns = conversationData.turns || [];
+
+            let html = '';
+
+            turns.forEach((turn, index) => {
+                html += `<div class="turn-item" id="turn-${index + 1}">
+                    <div class="turn-header">
+                        <span class="turn-number" onclick="scrollToTop()" title="Click to return to top">Turn ${index + 1}</span>
+                    </div>`;
+
+                if (showPrompts && turn.user_prompt) {
+                    html += `
+                        <div class="section-title">❤️ Riv</div>
+                        <div class="user-prompt">${escapeHtml(turn.user_prompt)}</div>
+                    `;
+                }
+
+                if (showResponses && turn.model_responses && turn.model_responses.length > 0) {
+                    // Only show the last response variant
+                    const lastResponse = turn.model_responses[turn.model_responses.length - 1];
+                    
+                    html += `
+                        <div class="section-title">💜 Gale</div>
+                        <div class="model-response">${escapeHtml(lastResponse)}</div>
+                    `;
+                }
+
+                html += `</div>`;
+            });
+
+            results.innerHTML = html;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function jumpToTurn() {
+            const turnNumber = parseInt(document.getElementById('jumpToTurn').value);
+            const totalTurns = conversationData?.turns?.length || 0;
+            
+            if (!turnNumber || turnNumber < 1) {
+                alert('Please enter a valid turn number');
+                return;
+            }
+            
+            if (turnNumber > totalTurns) {
+                alert(`Turn ${turnNumber} doesn't exist. This conversation has ${totalTurns} turns.`);
+                return;
+            }
+            
+            const targetElement = document.getElementById(`turn-${turnNumber}`);
+            if (targetElement) {
+                targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                // Add a brief highlight effect
+                targetElement.style.backgroundColor = '#e6fffa';
+                setTimeout(() => {
+                    targetElement.style.backgroundColor = '';
+                }, 2000);
+            }
+        }
+
+        function scrollToTop() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Allow Enter key to trigger jump
+        document.addEventListener('DOMContentLoaded', function() {
+            const jumpInput = document.getElementById('jumpToTurn');
+            if (jumpInput) {
+                jumpInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        jumpToTurn();
+                    }
+                });
+            }
+        });
+
+        function exportAsText() {
+            const turns = conversationData.turns || [];
+
+            let text = `Conversation: ${conversationData.conversation.title}\n`;
+            text += `Date: ${new Date(conversationData.conversation.creation_timestamp * 1000).toLocaleString()}\n`;
+            text += `Total Turns: ${turns.length}\n`;
+            text += `Token Count: ${conversationData.conversation.token_count}\n`;
+            text += `${'='.repeat(80)}\n\n`;
+
+            turns.forEach((turn, index) => {
+                if (turn.user_prompt) {
+                    text += `RIV:\n${turn.user_prompt}\n\n`;
+                }
+
+                if (turn.model_responses && turn.model_responses.length > 0) {
+                    const lastResponse = turn.model_responses[turn.model_responses.length - 1];
+                    text += `GALE:\n${lastResponse}\n\n`;
+                }
+                
+                // Add asterism scene separator between turns (but not after the last one)
+                if (index < turns.length - 1) {
+                    text += `* * *\n\n`;
+                }
+            });
+
+            downloadFile(text, `${conversationData.conversation.title || 'conversation'}.txt`, 'text/plain');
+        }
+
+        function exportAsJSON() {
+            const extracted = {
+                metadata: conversationData.conversation,
+                turns: conversationData.turns.map((turn, index) => ({
+                    turn_number: index + 1,
+                    timestamp: turn.creation_timestamp,
+                    user_prompt: turn.user_prompt,
+                    model_response: turn.model_responses && turn.model_responses.length > 0 
+                        ? turn.model_responses[turn.model_responses.length - 1]
+                        : null
+                }))
+            };
+
+            const json = JSON.stringify(extracted, null, 2);
+            downloadFile(json, `${conversationData.conversation.title || 'conversation'}_extracted.json`, 'application/json');
+        }
+
+        function copyToClipboard() {
+            const turns = conversationData.turns || [];
+            let text = '';
+
+            turns.forEach((turn, index) => {
+                if (turn.user_prompt) {
+                    text += `RIV:\n${turn.user_prompt}\n\n`;
+                }
+
+                if (turn.model_responses && turn.model_responses.length > 0) {
+                    const lastResponse = turn.model_responses[turn.model_responses.length - 1];
+                    text += `GALE:\n${lastResponse}\n\n`;
+                }
+                
+                // Add asterism scene separator between turns (but not after the last one)
+                if (index < turns.length - 1) {
+                    text += `* * *\n\n`;
+                }
+            });
+
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Copied to clipboard!');
+            }).catch(err => {
+                alert('Failed to copy: ' + err);
+            });
+        }
+
+        function downloadFile(content, filename, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
