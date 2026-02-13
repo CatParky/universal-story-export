@@ -264,7 +264,7 @@
             <h1>📖 Story Extractor</h1>
             <p>Extract user prompts and model responses from your JSON conversations</p>
             <p style="font-size: 0.9rem; margin-top: 0.5rem; opacity: 0.8;">Supports both Claude official format and Claude Exporter format</p>
-            <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.7;">Version 2.1 • Updated 14 February 2026</p>
+            <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.7;">Version 2.3 • Updated 14 February 2026</p>
         </div>
 
         <div class="content">
@@ -307,6 +307,10 @@
                         </label>
                     </div>
                     <div class="filter-row" style="margin-top: 1rem;">
+                        <label style="margin-right: 0.5rem;">Export Filename:</label>
+                        <input type="text" id="customChatName" placeholder="Auto-detected from conversation" style="padding: 0.5rem; border: 1px solid #cbd5e0; border-radius: 4px; flex: 1; max-width: 400px;">
+                    </div>
+                    <div class="filter-row" style="margin-top: 1rem;">
                         <label style="margin-right: 0.5rem;">Jump to Turn:</label>
                         <input type="number" id="jumpToTurn" min="1" placeholder="Enter turn number" style="padding: 0.5rem; border: 1px solid #cbd5e0; border-radius: 4px; width: 150px;">
                         <button class="btn" onclick="jumpToTurn()" style="padding: 0.5rem 1rem; margin: 0 0 0 0.5rem;">Go</button>
@@ -315,6 +319,7 @@
 
                 <div class="export-buttons">
                     <button class="btn" onclick="exportAsText()">📄 Export as Text</button>
+                    <button class="btn" onclick="exportAsText(true)">📑 Export Split (50 turns each)</button>
                     <button class="btn" onclick="exportAsJSON()">💾 Export as JSON</button>
                     <button class="btn" onclick="copyToClipboard()">📋 Copy All to Clipboard</button>
                 </div>
@@ -479,8 +484,20 @@
             // Update stats
             document.getElementById('totalTurns').textContent = turns.length;
             const tokenCount = conversation.token_count;
-            document.getElementById('totalTokens').textContent = tokenCount === 'N/A' ? 'N/A' : parseInt(tokenCount || 0).toLocaleString();
+            // Handle various token count formats
+            if (tokenCount === 'N/A' || tokenCount === null || tokenCount === undefined || tokenCount === '') {
+                document.getElementById('totalTokens').textContent = 'N/A';
+            } else {
+                const parsedTokens = parseInt(tokenCount);
+                document.getElementById('totalTokens').textContent = isNaN(parsedTokens) ? 'N/A' : parsedTokens.toLocaleString();
+            }
             document.getElementById('conversationTitle').textContent = conversation.title || 'Untitled';
+            
+            // Populate custom chat name field with conversation title as default
+            const customNameField = document.getElementById('customChatName');
+            if (customNameField && !customNameField.value) {
+                customNameField.placeholder = conversation.title || 'conversation';
+            }
 
             renderResults();
         }
@@ -568,32 +585,93 @@
             }
         });
 
-        function exportAsText() {
+        function exportAsText(split = false) {
             const turns = conversationData.turns || [];
+            const conversation = conversationData.conversation || {};
+            
+            // Use custom name if provided, otherwise fall back to conversation title
+            const customName = document.getElementById('customChatName').value.trim();
+            const title = customName || conversation.title || 'conversation';
+            
+            // Format date as yyyy-mm-dd from conversation timestamp
+            let dateStr = 'unknown-date';
+            if (conversation.creation_timestamp) {
+                const date = new Date(conversation.creation_timestamp * 1000);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                dateStr = `${year}-${month}-${day}`;
+            }
 
-            let text = `Conversation: ${conversationData.conversation.title}\n`;
-            text += `Date: ${new Date(conversationData.conversation.creation_timestamp * 1000).toLocaleString()}\n`;
-            text += `Total Turns: ${turns.length}\n`;
-            text += `Token Count: ${conversationData.conversation.token_count}\n`;
-            text += `${'='.repeat(80)}\n\n`;
+            if (!split) {
+                // Single file export
+                let text = `Conversation: ${title}\n`;
+                text += `Date: ${new Date(conversation.creation_timestamp * 1000).toLocaleString()}\n`;
+                text += `Total Turns: ${turns.length}\n`;
+                const tokenCount = conversation.token_count;
+                const displayTokens = (tokenCount === 'N/A' || !tokenCount) ? 'N/A' : tokenCount;
+                text += `Token Count: ${displayTokens}\n`;
+                text += `${'='.repeat(80)}\n\n`;
 
-            turns.forEach((turn, index) => {
-                if (turn.user_prompt) {
-                    text += `RIV:\n${turn.user_prompt}\n\n`;
+                turns.forEach((turn, index) => {
+                    if (turn.user_prompt) {
+                        text += `RIV:\n${turn.user_prompt}\n\n`;
+                    }
+
+                    if (turn.model_responses && turn.model_responses.length > 0) {
+                        const lastResponse = turn.model_responses[turn.model_responses.length - 1];
+                        text += `GALE:\n${lastResponse}\n\n`;
+                    }
+                    
+                    if (index < turns.length - 1) {
+                        text += `* * *\n\n`;
+                    }
+                });
+
+                downloadFile(text, `${dateStr} - ${title}.txt`, 'text/plain');
+            } else {
+                // Split export - 50 turns per file
+                const turnsPerFile = 50;
+                const totalParts = Math.ceil(turns.length / turnsPerFile);
+
+                for (let part = 0; part < totalParts; part++) {
+                    const startIdx = part * turnsPerFile;
+                    const endIdx = Math.min(startIdx + turnsPerFile, turns.length);
+                    const partTurns = turns.slice(startIdx, endIdx);
+                    
+                    let text = `Conversation: ${title} (Part ${part + 1} of ${totalParts})\n`;
+                    text += `Date: ${new Date(conversation.creation_timestamp * 1000).toLocaleString()}\n`;
+                    text += `Turns: ${startIdx + 1}-${endIdx} of ${turns.length}\n`;
+                    const tokenCount = conversation.token_count;
+                    const displayTokens = (tokenCount === 'N/A' || !tokenCount) ? 'N/A' : tokenCount;
+                    text += `Token Count: ${displayTokens}\n`;
+                    text += `${'='.repeat(80)}\n\n`;
+
+                    partTurns.forEach((turn, index) => {
+                        if (turn.user_prompt) {
+                            text += `RIV:\n${turn.user_prompt}\n\n`;
+                        }
+
+                        if (turn.model_responses && turn.model_responses.length > 0) {
+                            const lastResponse = turn.model_responses[turn.model_responses.length - 1];
+                            text += `GALE:\n${lastResponse}\n\n`;
+                        }
+                        
+                        if (index < partTurns.length - 1) {
+                            text += `* * *\n\n`;
+                        }
+                    });
+
+                    const filename = `${dateStr} - ${title} - Part ${part + 1}.txt`;
+                    downloadFile(text, filename, 'text/plain');
+                    
+                    // Add small delay between downloads to prevent browser blocking
+                    if (part < totalParts - 1) {
+                        // Use a promise to create async delay
+                        setTimeout(() => {}, 100);
+                    }
                 }
-
-                if (turn.model_responses && turn.model_responses.length > 0) {
-                    const lastResponse = turn.model_responses[turn.model_responses.length - 1];
-                    text += `GALE:\n${lastResponse}\n\n`;
-                }
-                
-                // Add asterism scene separator between turns (but not after the last one)
-                if (index < turns.length - 1) {
-                    text += `* * *\n\n`;
-                }
-            });
-
-            downloadFile(text, `${conversationData.conversation.title || 'conversation'}.txt`, 'text/plain');
+            }
         }
 
         function exportAsJSON() {
