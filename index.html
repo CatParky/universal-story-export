@@ -483,20 +483,34 @@
 
             // Update stats
             document.getElementById('totalTurns').textContent = turns.length;
+            
+            // Token count handling with extensive checks
             const tokenCount = conversation.token_count;
-            // Handle various token count formats
-            if (tokenCount === 'N/A' || tokenCount === null || tokenCount === undefined || tokenCount === '') {
-                document.getElementById('totalTokens').textContent = 'N/A';
+            const tokenDisplay = document.getElementById('totalTokens');
+            
+            if (!tokenCount || tokenCount === 'N/A' || tokenCount === null || tokenCount === undefined || tokenCount === '') {
+                tokenDisplay.textContent = 'N/A';
+            } else if (typeof tokenCount === 'string' && tokenCount.toLowerCase() === 'n/a') {
+                tokenDisplay.textContent = 'N/A';
             } else {
                 const parsedTokens = parseInt(tokenCount);
-                document.getElementById('totalTokens').textContent = isNaN(parsedTokens) ? 'N/A' : parsedTokens.toLocaleString();
+                if (isNaN(parsedTokens) || parsedTokens < 0) {
+                    tokenDisplay.textContent = 'N/A';
+                } else {
+                    tokenDisplay.textContent = parsedTokens.toLocaleString();
+                }
             }
+            
             document.getElementById('conversationTitle').textContent = conversation.title || 'Untitled';
             
             // Populate custom chat name field with conversation title as default
             const customNameField = document.getElementById('customChatName');
-            if (customNameField && !customNameField.value) {
-                customNameField.placeholder = conversation.title || 'conversation';
+            if (customNameField) {
+                // Don't overwrite if user has already typed something
+                if (!customNameField.value || customNameField.value === customNameField.placeholder) {
+                    customNameField.placeholder = conversation.title || 'conversation';
+                    customNameField.value = ''; // Clear to show placeholder
+                }
             }
 
             renderResults();
