@@ -56,14 +56,14 @@
             border-radius: 12px;
             padding: 3rem;
             text-align: center;
-            background: #f7fafc;
+            background: #f3e8ff;
             transition: all 0.3s ease;
             cursor: pointer;
         }
 
         .upload-section:hover {
             border-color: #667eea;
-            background: #edf2f7;
+            background: #ede9fe;
         }
 
         .upload-section.dragover {
@@ -114,11 +114,11 @@
         }
 
         .stat-card {
-            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            background: linear-gradient(135deg, #f3e8ff 0%, #ede9fe 100%);
             padding: 1.5rem;
             border-radius: 12px;
             text-align: center;
-            border: 1px solid #e2e8f0;
+            border: 1px solid #e9d5ff;
         }
 
         .stat-number {
@@ -140,7 +140,7 @@
         }
 
         .turn-item {
-            background: #f7fafc;
+            background: #f3e8ff;
             border-left: 4px solid #667eea;
             padding: 1.5rem;
             margin-bottom: 1.5rem;
@@ -166,6 +166,13 @@
             border-radius: 20px;
             font-size: 0.9rem;
             font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .turn-number:hover {
+            background: #764ba2;
+            transform: scale(1.05);
         }
 
         .section-title {
@@ -185,10 +192,6 @@
             line-height: 1.6;
             white-space: pre-wrap;
             border: 1px solid #e2e8f0;
-        }
-
-        .model-response {
-            background: #faf5ff;
         }
 
         .loading {
@@ -225,7 +228,7 @@
         }
 
         .filters {
-            background: #edf2f7;
+            background: #ede9fe;
             padding: 1.5rem;
             border-radius: 12px;
             margin-bottom: 2rem;
@@ -260,6 +263,8 @@
         <div class="header">
             <h1>📖 Story Extractor</h1>
             <p>Extract user prompts and model responses from your JSON conversations</p>
+            <p style="font-size: 0.9rem; margin-top: 0.5rem; opacity: 0.8;">Supports both Claude official format and Claude Exporter format</p>
+            <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.7;">Version 2.1 • Updated 14 February 2026</p>
         </div>
 
         <div class="content">
@@ -295,11 +300,16 @@
                 <div class="filters">
                     <div class="filter-row">
                         <label>
-                            <input type="checkbox" id="showPrompts" checked> Show User Prompts
+                            <input type="checkbox" id="showPrompts" checked> Show Riv
                         </label>
                         <label>
-                            <input type="checkbox" id="showResponses" checked> Show Model Responses
+                            <input type="checkbox" id="showResponses" checked> Show Gale
                         </label>
+                    </div>
+                    <div class="filter-row" style="margin-top: 1rem;">
+                        <label style="margin-right: 0.5rem;">Jump to Turn:</label>
+                        <input type="number" id="jumpToTurn" min="1" placeholder="Enter turn number" style="padding: 0.5rem; border: 1px solid #cbd5e0; border-radius: 4px; width: 150px;">
+                        <button class="btn" onclick="jumpToTurn()" style="padding: 0.5rem 1rem; margin: 0 0 0 0.5rem;">Go</button>
                     </div>
                 </div>
 
@@ -360,7 +370,8 @@
             const reader = new FileReader();
             reader.onload = (e) => {
                 try {
-                    conversationData = JSON.parse(e.target.result);
+                    const rawData = JSON.parse(e.target.result);
+                    conversationData = normalizeFormat(rawData);
                     displayResults();
                     loading.classList.remove('active');
                     statsSection.style.display = 'block';
@@ -373,13 +384,102 @@
             reader.readAsText(file);
         }
 
+        function normalizeFormat(data) {
+            // Detect format and normalize to standard structure
+            
+            // Format 1: Official Claude format (has "turns" array)
+            if (data.turns && Array.isArray(data.turns)) {
+                return data;
+            }
+            
+            // Format 2: Claude Exporter format (has "messages" array with role/say)
+            if (data.messages && Array.isArray(data.messages)) {
+                return {
+                    conversation: {
+                        title: data.metadata?.title || 'Untitled',
+                        creation_timestamp: new Date(data.metadata?.dates?.created).getTime() / 1000 || 0,
+                        update_timestamp: new Date(data.metadata?.dates?.updated).getTime() / 1000 || 0,
+                        token_count: 'N/A'
+                    },
+                    turns: convertMessagesToTurns(data.messages)
+                };
+            }
+            
+            // Unknown format
+            throw new Error('Unrecognized JSON format. Expected either Claude official format or Claude Exporter format.');
+        }
+
+        function convertMessagesToTurns(messages) {
+            const turns = [];
+            let currentTurn = null;
+            
+            messages.forEach((msg, index) => {
+                if (msg.role === 'Prompt') {
+                    // Start a new turn with user prompt
+                    currentTurn = {
+                        conversation_id: '',
+                        creation_timestamp: index,
+                        user_id: '',
+                        user_prompt: fixEncoding(msg.say),
+                        model_responses: [],
+                        model_thoughts: [],
+                        update_timestamp: index,
+                        attachments: []
+                    };
+                } else if (msg.role === 'Response' && currentTurn) {
+                    // Add response to current turn
+                    // Remove "Thought:" prefix if present
+                    let responseText = msg.say;
+                    if (responseText.includes('Thought:')) {
+                        // Extract just the response part after thought
+                        const parts = responseText.split('\n\n\n');
+                        responseText = parts.slice(1).join('\n\n\n').trim();
+                    }
+                    currentTurn.model_responses.push(fixEncoding(responseText));
+                    turns.push(currentTurn);
+                    currentTurn = null;
+                }
+            });
+            
+            // Handle case where last turn doesn't have a response
+            if (currentTurn) {
+                turns.push(currentTurn);
+            }
+            
+            return turns;
+        }
+
+        function fixEncoding(text) {
+            if (!text) return text;
+            
+            // Fix common UTF-8 encoding issues
+            return text
+                .replace(/â€"/g, '—')      // em dash
+                .replace(/â€™/g, "'")      // right single quotation mark
+                .replace(/â€œ/g, '"')      // left double quotation mark
+                .replace(/â€/g, '"')       // right double quotation mark
+                .replace(/â€¦/g, '...')    // ellipsis
+                .replace(/â€˜/g, "'")      // left single quotation mark
+                .replace(/Â /g, ' ')       // non-breaking space
+                .replace(/â€"/g, '–')      // en dash
+                .replace(/Ã©/g, 'é')       // e with acute
+                .replace(/Ã¨/g, 'è')       // e with grave
+                .replace(/Ã /g, 'à')       // a with grave
+                .replace(/Ã§/g, 'ç')       // c with cedilla
+                .replace(/â€¢/g, '•')      // bullet point
+                .replace(/â„¢/g, '™')      // trademark
+                .replace(/Â©/g, '©')       // copyright
+                .replace(/Â®/g, '®');      // registered trademark
+        }
+
         function displayResults() {
             const turns = conversationData.turns || [];
             const conversation = conversationData.conversation || {};
 
             // Update stats
             document.getElementById('totalTurns').textContent = turns.length;
-            document.getElementById('totalTokens').textContent = parseInt(conversation.token_count || 0).toLocaleString();
+            const tokenCount = conversation.token_count;
+            document.getElementById('totalTokens').textContent = tokenCount === 'N/A' ? 'N/A' : parseInt(tokenCount || 0).toLocaleString();
             document.getElementById('conversationTitle').textContent = conversation.title || 'Untitled';
 
             renderResults();
@@ -393,14 +493,14 @@
             let html = '';
 
             turns.forEach((turn, index) => {
-                html += `<div class="turn-item">
+                html += `<div class="turn-item" id="turn-${index + 1}">
                     <div class="turn-header">
-                        <span class="turn-number">Turn ${index + 1}</span>
+                        <span class="turn-number" onclick="scrollToTop()" title="Click to return to top">Turn ${index + 1}</span>
                     </div>`;
 
                 if (showPrompts && turn.user_prompt) {
                     html += `
-                        <div class="section-title">👤 User Prompt</div>
+                        <div class="section-title">❤️ Riv</div>
                         <div class="user-prompt">${escapeHtml(turn.user_prompt)}</div>
                     `;
                 }
@@ -410,7 +510,7 @@
                     const lastResponse = turn.model_responses[turn.model_responses.length - 1];
                     
                     html += `
-                        <div class="section-title">🤖 Model Response</div>
+                        <div class="section-title">💜 Gale</div>
                         <div class="model-response">${escapeHtml(lastResponse)}</div>
                     `;
                 }
@@ -426,6 +526,47 @@
             div.textContent = text;
             return div.innerHTML;
         }
+
+        function jumpToTurn() {
+            const turnNumber = parseInt(document.getElementById('jumpToTurn').value);
+            const totalTurns = conversationData?.turns?.length || 0;
+            
+            if (!turnNumber || turnNumber < 1) {
+                alert('Please enter a valid turn number');
+                return;
+            }
+            
+            if (turnNumber > totalTurns) {
+                alert(`Turn ${turnNumber} doesn't exist. This conversation has ${totalTurns} turns.`);
+                return;
+            }
+            
+            const targetElement = document.getElementById(`turn-${turnNumber}`);
+            if (targetElement) {
+                targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                // Add a brief highlight effect
+                targetElement.style.backgroundColor = '#e6fffa';
+                setTimeout(() => {
+                    targetElement.style.backgroundColor = '';
+                }, 2000);
+            }
+        }
+
+        function scrollToTop() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Allow Enter key to trigger jump
+        document.addEventListener('DOMContentLoaded', function() {
+            const jumpInput = document.getElementById('jumpToTurn');
+            if (jumpInput) {
+                jumpInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        jumpToTurn();
+                    }
+                });
+            }
+        });
 
         function exportAsText() {
             const turns = conversationData.turns || [];
