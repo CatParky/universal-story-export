@@ -385,11 +385,16 @@
                 <div class="filters">
                     <div class="filter-row">
                         <label>
-                            <input type="checkbox" id="showPrompts" checked> Show Riv
+                            <input type="checkbox" id="showPrompts" checked> Show User
                         </label>
                         <label>
-                            <input type="checkbox" id="showResponses" checked> Show Gale
+                            <input type="checkbox" id="showResponses" checked> Show Assistant
                         </label>
+                    </div>
+                    <div class="filter-row" style="margin-top: 1rem;">
+                        <label style="margin-right: 0.5rem;">Character Names:</label>
+                        <input type="text" id="userCharacterName" placeholder="User character (e.g., Riv)" value="Riv" style="padding: 0.5rem; border: 1px solid #cbd5e0; border-radius: 4px; width: 150px; margin-right: 1rem;">
+                        <input type="text" id="assistantCharacterName" placeholder="Assistant character (e.g., Gale)" value="Gale" style="padding: 0.5rem; border: 1px solid #cbd5e0; border-radius: 4px; width: 150px;">
                     </div>
                     <div class="filter-row" style="margin-top: 1rem;">
                         <label style="margin-right: 0.5rem;">Export Filename:</label>
@@ -469,6 +474,10 @@
         // Filter handlers
         document.getElementById('showPrompts').addEventListener('change', renderResults);
         document.getElementById('showResponses').addEventListener('change', renderResults);
+        
+        // Update display when character names change
+        document.getElementById('userCharacterName').addEventListener('input', renderResults);
+        document.getElementById('assistantCharacterName').addEventListener('input', renderResults);
 
         function handleFile(file) {
             loading.classList.add('active');
@@ -743,6 +752,10 @@
             const showPrompts = document.getElementById('showPrompts').checked;
             const showResponses = document.getElementById('showResponses').checked;
             const turns = conversationData.turns || [];
+            
+            // Get custom character names
+            const userChar = document.getElementById('userCharacterName').value || 'User';
+            const assistantChar = document.getElementById('assistantCharacterName').value || 'Assistant';
 
             let html = '';
 
@@ -754,7 +767,7 @@
 
                 if (showPrompts && turn.user_prompt) {
                     html += `
-                        <div class="section-title">❤️ Riv</div>
+                        <div class="section-title">❤️ ${escapeHtml(userChar)}</div>
                         <div class="user-prompt">${escapeHtml(turn.user_prompt)}</div>
                     `;
                 }
@@ -764,7 +777,7 @@
                     const lastResponse = turn.model_responses[turn.model_responses.length - 1];
                     
                     html += `
-                        <div class="section-title">💜 Gale</div>
+                        <div class="section-title">💜 ${escapeHtml(assistantChar)}</div>
                         <div class="model-response">${escapeHtml(lastResponse)}</div>
                     `;
                 }
@@ -830,6 +843,10 @@
             const customName = document.getElementById('customChatName').value.trim();
             const title = customName || conversation.title || 'conversation';
             
+            // Get custom character names
+            const userChar = (document.getElementById('userCharacterName').value || 'User').toUpperCase();
+            const assistantChar = (document.getElementById('assistantCharacterName').value || 'Assistant').toUpperCase();
+            
             // Format date as yyyy-mm-dd from conversation timestamp
             let dateStr = 'unknown-date';
             if (conversation.creation_timestamp) {
@@ -852,12 +869,12 @@
 
                 turns.forEach((turn, index) => {
                     if (turn.user_prompt) {
-                        text += `RIV:\n${turn.user_prompt}\n\n`;
+                        text += `${userChar}:\n${turn.user_prompt}\n\n`;
                     }
 
                     if (turn.model_responses && turn.model_responses.length > 0) {
                         const lastResponse = turn.model_responses[turn.model_responses.length - 1];
-                        text += `GALE:\n${lastResponse}\n\n`;
+                        text += `${assistantChar}:\n${lastResponse}\n\n`;
                     }
                     
                     if (index < turns.length - 1) {
@@ -886,12 +903,12 @@
 
                     partTurns.forEach((turn, index) => {
                         if (turn.user_prompt) {
-                            text += `RIV:\n${turn.user_prompt}\n\n`;
+                            text += `${userChar}:\n${turn.user_prompt}\n\n`;
                         }
 
                         if (turn.model_responses && turn.model_responses.length > 0) {
                             const lastResponse = turn.model_responses[turn.model_responses.length - 1];
-                            text += `GALE:\n${lastResponse}\n\n`;
+                            text += `${assistantChar}:\n${lastResponse}\n\n`;
                         }
                         
                         if (index < partTurns.length - 1) {
