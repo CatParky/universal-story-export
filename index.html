@@ -256,6 +256,89 @@
             margin-top: 0.5rem;
         }
 
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .modal-header {
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .modal-header h2 {
+            color: #2d3748;
+            margin-bottom: 0.5rem;
+        }
+
+        .conversation-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .conversation-item {
+            background: #f3e8ff;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .conversation-item:hover {
+            border-color: #667eea;
+            transform: translateX(4px);
+        }
+
+        .conversation-item.selected {
+            border-color: #667eea;
+            background: #ede9fe;
+        }
+
+        .conversation-name {
+            font-weight: bold;
+            color: #2d3748;
+            margin-bottom: 0.3rem;
+        }
+
+        .conversation-meta {
+            font-size: 0.85rem;
+            color: #718096;
+        }
+
+        .modal-footer {
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            border-top: 2px solid #e2e8f0;
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+        }
+
     </style>
 </head>
 <body>
@@ -263,8 +346,10 @@
         <div class="header">
             <h1>📖 Story Extractor</h1>
             <p>Extract user prompts and model responses from your JSON conversations</p>
-            <p style="font-size: 0.9rem; margin-top: 0.5rem; opacity: 0.8;">Supports both Claude official format and Claude Exporter format</p>
-            <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.7;">Version 2.3 • Updated 14 February 2026</p>
+            <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.7;">Version 2.4 • Updated 18 February 2026</p>
+            <p style="font-size: 0.8rem; margin-top: 0.3rem; opacity: 0.6;">
+                Supports: Claude Official (single & bulk), Nessie Labs, Claude Exporter
+            </p>
         </div>
 
         <div class="content">
@@ -329,8 +414,25 @@
         </div>
     </div>
 
+    <!-- Conversation Selection Modal -->
+    <div class="modal" id="conversationModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Select a Conversation</h2>
+                <p style="color: #718096; font-size: 0.9rem;">This file contains multiple conversations. Choose one to extract:</p>
+            </div>
+            <div class="conversation-list" id="conversationList"></div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeConversationModal()">Cancel</button>
+                <button class="btn" onclick="loadSelectedConversation()">Load Conversation</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let conversationData = null;
+        let bulkConversationsData = null;
+        let selectedConversationIndex = null;
 
         const uploadSection = document.getElementById('uploadSection');
         const fileInput = document.getElementById('fileInput');
@@ -377,6 +479,12 @@
                 try {
                     const rawData = JSON.parse(e.target.result);
                     conversationData = normalizeFormat(rawData);
+                    
+                    // If normalizeFormat returns null, it means we're showing conversation selector
+                    if (conversationData === null) {
+                        return; // Modal is now showing, wait for user selection
+                    }
+                    
                     displayResults();
                     loading.classList.remove('active');
                     statsSection.style.display = 'block';
@@ -410,8 +518,15 @@
                 };
             }
             
+            // Format 3: Claude Bulk Export (array of conversations with chat_messages)
+            if (Array.isArray(data) && data.length > 0 && data[0].chat_messages) {
+                // This is a bulk export - show conversation selector
+                showConversationSelector(data);
+                return null; // Don't process yet, wait for user selection
+            }
+            
             // Unknown format
-            throw new Error('Unrecognized JSON format. Expected either Claude official format or Claude Exporter format.');
+            throw new Error('Unrecognized JSON format. Expected Claude official, Nessie Labs, Claude Exporter, or Claude bulk export format.');
         }
 
         function convertMessagesToTurns(messages) {
@@ -452,6 +567,114 @@
             }
             
             return turns;
+        }
+
+        function showConversationSelector(conversations) {
+            bulkConversationsData = conversations;
+            const modal = document.getElementById('conversationModal');
+            const list = document.getElementById('conversationList');
+            
+            list.innerHTML = '';
+            
+            conversations.forEach((conv, index) => {
+                const item = document.createElement('div');
+                item.className = 'conversation-item';
+                item.onclick = () => selectConversation(index);
+                
+                const name = conv.name || conv.summary?.split('\n')[0] || 'Untitled Conversation';
+                const created = new Date(conv.created_at).toLocaleDateString();
+                const messageCount = conv.chat_messages?.length || 0;
+                
+                item.innerHTML = `
+                    <div class="conversation-name">${name}</div>
+                    <div class="conversation-meta">${created} • ${messageCount} messages</div>
+                `;
+                
+                list.appendChild(item);
+            });
+            
+            modal.classList.add('active');
+            loading.classList.remove('active');
+        }
+
+        function selectConversation(index) {
+            selectedConversationIndex = index;
+            document.querySelectorAll('.conversation-item').forEach((item, i) => {
+                item.classList.toggle('selected', i === index);
+            });
+        }
+
+        function closeConversationModal() {
+            document.getElementById('conversationModal').classList.remove('active');
+            uploadSection.style.display = 'block';
+            bulkConversationsData = null;
+            selectedConversationIndex = null;
+        }
+
+        function loadSelectedConversation() {
+            if (selectedConversationIndex === null) {
+                alert('Please select a conversation');
+                return;
+            }
+            
+            const selectedConv = bulkConversationsData[selectedConversationIndex];
+            document.getElementById('conversationModal').classList.remove('active');
+            loading.classList.add('active');
+            
+            try {
+                conversationData = convertBulkConversation(selectedConv);
+                displayResults();
+                loading.classList.remove('active');
+                statsSection.style.display = 'block';
+            } catch (error) {
+                alert('Error processing conversation: ' + error.message);
+                loading.classList.remove('active');
+                uploadSection.style.display = 'block';
+            }
+        }
+
+        function convertBulkConversation(conv) {
+            // Convert Claude bulk format to standard format
+            const turns = [];
+            let currentTurn = null;
+            
+            conv.chat_messages.forEach((msg, index) => {
+                const text = msg.text || msg.content?.[0]?.text || '';
+                
+                if (msg.sender === 'human') {
+                    // Start new turn
+                    currentTurn = {
+                        conversation_id: conv.uuid,
+                        creation_timestamp: new Date(msg.created_at).getTime() / 1000,
+                        user_id: '',
+                        user_prompt: text,
+                        model_responses: [],
+                        model_thoughts: [],
+                        update_timestamp: new Date(msg.updated_at).getTime() / 1000,
+                        attachments: msg.attachments || []
+                    };
+                } else if (msg.sender === 'assistant' && currentTurn) {
+                    // Add response to current turn
+                    currentTurn.model_responses.push(text);
+                    turns.push(currentTurn);
+                    currentTurn = null;
+                }
+            });
+            
+            // Handle last turn if incomplete
+            if (currentTurn) {
+                turns.push(currentTurn);
+            }
+            
+            return {
+                conversation: {
+                    title: conv.name || 'Untitled',
+                    creation_timestamp: new Date(conv.created_at).getTime() / 1000,
+                    update_timestamp: new Date(conv.updated_at).getTime() / 1000,
+                    token_count: 'N/A'
+                },
+                turns: turns
+            };
         }
 
         function fixEncoding(text) {
