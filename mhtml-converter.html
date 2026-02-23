@@ -273,47 +273,78 @@
                 // Decode the entire HTML content from quoted-printable
                 content = decodeQuotedPrintable(content);
                 
-                // Extract messages using the decoded HTML
-                const messagePattern = /<p class="mb-1 break-words"[^>]*>(.*?)<\/p>/gs;
-                const matches = [...content.matchAll(messagePattern)];
+                // Find all speaker indicators and their associated messages
+                // Pattern: speaker indicator (💜 or ❤️ or <em> tag) followed by one or more <p> tags
+                const speakerPattern = /(💜|❤️|<em class="mb-1[^>]*>.*?<\/em>)(.*?)(?=💜|❤️|<em class="mb-1|$)/gs;
+                const speakerMatches = [...content.matchAll(speakerPattern)];
                 
-                const messages = matches.map(match => {
-                    let text = match[1];
-                    // Remove HTML tags but preserve text
-                    text = text.replace(/<[^>]+>/g, '');
-                    // Decode HTML entities
-                    text = decodeHTML(text);
-                    return text.trim();
-                }).filter(msg => msg.length > 0);
+                const messages = [];
+                for (const match of speakerMatches) {
+                    const speaker = match[1].includes('💜') ? 'assistant' : 'user';
+                    const messageHTML = match[2];
+                    
+                    // Extract all paragraph texts
+                    const paragraphPattern = /<p class="mb-1 break-words"[^>]*>(.*?)<\/p>/gs;
+                    const paragraphs = [...messageHTML.matchAll(paragraphPattern)];
+                    
+                    if (paragraphs.length > 0) {
+                        // Combine all paragraphs for this speaker
+                        const combinedText = paragraphs.map(p => {
+                            let text = p[1];
+                            // Remove HTML tags but preserve text
+                            text = text.replace(/<[^>]+>/g, '');
+                            // Decode HTML entities
+                            text = decodeHTML(text);
+                            return text.trim();
+                        }).filter(t => t.length > 0).join('\n\n');
+                        
+                        if (combinedText.length > 0) {
+                            messages.push({ speaker, text: combinedText });
+                        }
+                    }
+                }
                 
                 // Check if user wants swapped order
                 const swapOrder = document.getElementById('swapOrder').checked;
                 
-                // Create turns (pair messages)
+                // Create turns by pairing user and assistant messages
                 const turns = [];
-                for (let i = 0; i < messages.length - 1; i += 2) {
-                    let userMsg, assistantMsg;
+                for (let i = 0; i < messages.length; i++) {
+                    const current = messages[i];
+                    const next = messages[i + 1];
                     
-                    if (swapOrder) {
-                        // First message is assistant, second is user
-                        assistantMsg = messages[i];
-                        userMsg = messages[i + 1];
+                    // Look for user-assistant pairs
+                    if (!swapOrder) {
+                        // Default: User first, then Assistant
+                        if (current.speaker === 'user' && next && next.speaker === 'assistant') {
+                            turns.push({
+                                conversation_id: '',
+                                creation_timestamp: turns.length,
+                                user_id: '',
+                                user_prompt: current.text,
+                                model_responses: [next.text],
+                                model_thoughts: [],
+                                update_timestamp: String(turns.length),
+                                attachments: []
+                            });
+                            i++; // Skip the next message since we paired it
+                        }
                     } else {
-                        // First message is user, second is assistant (default)
-                        userMsg = messages[i];
-                        assistantMsg = messages[i + 1];
+                        // Swapped: Assistant first, then User
+                        if (current.speaker === 'assistant' && next && next.speaker === 'user') {
+                            turns.push({
+                                conversation_id: '',
+                                creation_timestamp: turns.length,
+                                user_id: '',
+                                user_prompt: next.text,
+                                model_responses: [current.text],
+                                model_thoughts: [],
+                                update_timestamp: String(turns.length),
+                                attachments: []
+                            });
+                            i++; // Skip the next message since we paired it
+                        }
                     }
-                    
-                    turns.push({
-                        conversation_id: '',
-                        creation_timestamp: i / 2,
-                        user_id: '',
-                        user_prompt: userMsg,
-                        model_responses: [assistantMsg],
-                        model_thoughts: [],
-                        update_timestamp: String(i / 2),
-                        attachments: []
-                    });
                 }
                 
                 // Create conversation object
