@@ -388,8 +388,19 @@
                 
                 console.log(`Extracted ${messageBlocks.length} message blocks`);
                 
-                // Pair into turns
-                const swapOrder = document.getElementById('swapOrder').checked;
+                // Auto-detect message order
+                let swapOrder = document.getElementById('swapOrder').checked;
+                
+                // If not manually set, auto-detect based on first two messages
+                if (!swapOrder && messageBlocks.length >= 2) {
+                    if (messageBlocks[0].speaker === 'assistant' && messageBlocks[1].speaker === 'user') {
+                        console.log('Auto-detected: Chat starts with Assistant, auto-enabling swap');
+                        swapOrder = true;
+                    }
+                }
+                
+                console.log(`Using swap order: ${swapOrder}`);
+                
                 const turns = [];
                 
                 for (let i = 0; i < messageBlocks.length; i++) {
