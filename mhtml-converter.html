@@ -281,7 +281,11 @@
             
             reader.onload = function(e) {
                 try {
-                    let content = e.target.result;
+                    // Read as ArrayBuffer and decode with proper UTF-8
+                    const bytes = new Uint8Array(e.target.result);
+                    const decoder = new TextDecoder('utf-8');
+                    let content = decoder.decode(bytes);
+                    
                     console.log('File loaded, size:', content.length);
                     
                     const assistantName = document.getElementById('assistantName').value.trim();
@@ -372,36 +376,33 @@
                                 text = text.replace(/<[^>]+>/g, '');
                                 text = decodeHTML(text);
                                 
-                                // Fix UTF-8 encoding artifacts
-                                // These are multi-byte sequences that need to be replaced as complete units
-                                text = text.replace(/â€"/g, '—');    // Em dash (complete sequence)
-                                text = text.replace(/â€"/g, '–');    // En dash
-                                text = text.replace(/â€™/g, "'");    // Right single quote/apostrophe
-                                text = text.replace(/â€˜/g, "'");    // Left single quote
-                                text = text.replace(/â€œ/g, '"');    // Left double quote  
-                                text = text.replace(/â€/g, '"');     // Right double quote
-                                text = text.replace(/â€¦/g, '…');    // Horizontal ellipsis
-                                text = text.replace(/Â /g, ' ');     // Non-breaking space with space
-                                text = text.replace(/Â/g, '');       // Stray Â
+                                // Remove ALL control characters (U+0080-U+009F)
+                                text = text.replace(/[\u0080-\u009F]/g, '');
                                 
-                                // Fix DOUBLE-encoded UTF-8 (critical for this MHTML file!)
-                                text = text.replace(/—'/g, "'");      // —' → '
-                                text = text.replace(/—'/g, "'");      // —' → '  
-                                text = text.replace(/—"/g, '"');      // —" → "
-                                text = text.replace(/—"/g, '"');      // —" → "
-                                text = text.replace(/—¦/g, '…');      // —¦ → …
+                                // Now clean up the remaining characters
+                                // After removing control chars, "—" followed by punctuation becomes just punctuation
+                                text = text.replace(/—"/g, '"');      // Em dash + quote = quote
+                                text = text.replace(/—"/g, '"');      // Em dash + quote = quote
+                                text = text.replace(/—'/g, "'");      // Em dash + apostrophe = apostrophe
+                                text = text.replace(/—'/g, "'");      // Em dash + apostrophe = apostrophe
+                                text = text.replace(/—¦/g, '…');      // Em dash + broken ellipsis = ellipsis
+                                text = text.replace(/—…/g, '…');      // Em dash + ellipsis = ellipsis
                                 
-                                // Fix the specific pattern where quotes become em dashes
-                                // Pattern: —Word—s word—s → "Word's" or 'word's'
-                                text = text.replace(/—([A-Za-z]+)—s/g, '"$1\'s"');
-                                text = text.replace(/—([A-Za-z]+)—/g, '"$1"');
-                                
-                                // Fix stray single â that represents em dash
+                                // Standard UTF-8 artifact fixes
+                                text = text.replace(/â€"/g, '—');
+                                text = text.replace(/â€™/g, "'");
+                                text = text.replace(/â€œ/g, '"');
+                                text = text.replace(/â€/g, '"');
+                                text = text.replace(/â€¦/g, '…');
+                                text = text.replace(/Â/g, '');
                                 text = text.replace(/â/g, '—');
                                 
                                 // Fix missing spaces
                                 text = text.replace(/([.!?,;:"])([A-Z])/g, '$1 $2');
                                 text = text.replace(/([a-z])([A-Z])/g, '$1 $2');
+                                
+                                // Clean up multiple spaces
+                                text = text.replace(/\s+/g, ' ');
                                 
                                 return text.trim();
                             }).filter(t => t.length > 0);
@@ -566,7 +567,7 @@
                 alert('Error reading file: ' + error);
             };
             
-            reader.readAsText(file);
+            reader.readAsArrayBuffer(file);  // Read as binary to avoid encoding issues
         }
     </script>
 </body>
