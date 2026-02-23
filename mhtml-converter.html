@@ -373,12 +373,27 @@
                                 text = decodeHTML(text);
                                 
                                 // Fix UTF-8 encoding artifacts
-                                text = text.replace(/â/g, '—');      // Em dash
-                                text = text.replace(/â€™/g, "'");    // Apostrophe
-                                text = text.replace(/â€œ/g, '"');    // Opening quote
-                                text = text.replace(/â€/g, '"');     // Closing quote
-                                text = text.replace(/â€¦/g, '…');    // Ellipsis
-                                text = text.replace(/Â/g, '');       // Non-breaking space artifact
+                                // These are multi-byte sequences that need to be replaced as complete units
+                                text = text.replace(/â€"/g, '—');    // Em dash (complete sequence)
+                                text = text.replace(/â€"/g, '–');    // En dash
+                                text = text.replace(/â€™/g, "'");    // Right single quote/apostrophe
+                                text = text.replace(/â€˜/g, "'");    // Left single quote
+                                text = text.replace(/â€œ/g, '"');    // Left double quote  
+                                text = text.replace(/â€/g, '"');     // Right double quote
+                                text = text.replace(/â€¦/g, '…');    // Horizontal ellipsis
+                                text = text.replace(/Â /g, ' ');     // Non-breaking space with space
+                                text = text.replace(/Â/g, '');       // Stray Â
+                                
+                                // Fix the specific pattern where quotes become em dashes
+                                // Pattern: —Word—s word—s → "Word's" or 'word's'
+                                text = text.replace(/—([A-Za-z]+)—s/g, '"$1\'s"');
+                                text = text.replace(/—([A-Za-z]+)—/g, '"$1"');
+                                
+                                // Fix —¦ which is malformed ellipsis
+                                text = text.replace(/—¦/g, '…');
+                                
+                                // Fix stray single â that represents em dash
+                                text = text.replace(/â/g, '—');
                                 
                                 // Fix missing spaces
                                 text = text.replace(/([.!?,;:"])([A-Z])/g, '$1 $2');
