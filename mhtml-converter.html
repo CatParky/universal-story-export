@@ -180,7 +180,7 @@
             </div>
             <h1>💜 Chat MHTML to JSON Converter</h1>
             <p>Convert saved chat exports for use with Story Extractor</p>
-            <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.8;">Version 1.5 • 23 February 2026</p>
+            <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.8;">Version 1.6 • 23 February 2026</p>
         </div>
 
         <div class="content">
@@ -384,13 +384,17 @@
                                 text = text.replace(/Â /g, ' ');     // Non-breaking space with space
                                 text = text.replace(/Â/g, '');       // Stray Â
                                 
+                                // Fix DOUBLE-encoded UTF-8 (critical for this MHTML file!)
+                                text = text.replace(/—'/g, "'");      // —' → '
+                                text = text.replace(/—'/g, "'");      // —' → '  
+                                text = text.replace(/—"/g, '"');      // —" → "
+                                text = text.replace(/—"/g, '"');      // —" → "
+                                text = text.replace(/—¦/g, '…');      // —¦ → …
+                                
                                 // Fix the specific pattern where quotes become em dashes
                                 // Pattern: —Word—s word—s → "Word's" or 'word's'
                                 text = text.replace(/—([A-Za-z]+)—s/g, '"$1\'s"');
                                 text = text.replace(/—([A-Za-z]+)—/g, '"$1"');
-                                
-                                // Fix —¦ which is malformed ellipsis
-                                text = text.replace(/—¦/g, '…');
                                 
                                 // Fix stray single â that represents em dash
                                 text = text.replace(/â/g, '—');
