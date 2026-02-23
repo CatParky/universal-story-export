@@ -280,209 +280,250 @@
             const reader = new FileReader();
             
             reader.onload = function(e) {
-                let content = e.target.result;
-                
-                const assistantName = document.getElementById('assistantName').value.trim();
-                const userName = document.getElementById('userName').value.trim();
-                
-                // Extract title
-                let title = 'Conversation';
-                const subjectMatch = content.match(/Subject:\s*(.+?)(?:\r?\n(?!\s))/s);
-                if (subjectMatch) {
-                    let rawSubject = subjectMatch[1];
-                    rawSubject = rawSubject.replace(/=\?[^?]+\?[QB]\?([^?]+)\?=/gi, (match, encoded) => {
-                        encoded = encoded.replace(/=\r?\n\s*/g, '');
-                        return decodeQuotedPrintable(encoded);
-                    });
-                    rawSubject = rawSubject.replace(/\r?\n\s*/g, '');
-                    title = rawSubject
-                        .replace(/\s*\|\s*\d+\s*memories.*$/i, '')
-                        .replace(/\s*\|\s*\d+\s*interactions.*$/i, '')
-                        .trim();
-                    title = cleanTitle(title);
-                }
-                
-                // Find HTML and decode
-                const htmlStartIndex = content.indexOf('<!DOCTYPE html>');
-                if (htmlStartIndex !== -1) {
-                    content = content.substring(htmlStartIndex);
-                }
-                content = decodeQuotedPrintable(content);
-                
-                // NEW APPROACH: Find all speaker positions, then extract content between them
-                const speakerPattern = /<span>([^<]+)<\/span>/g;
-                const speakerPositions = [];
-                let match;
-                
-                while ((match = speakerPattern.exec(content)) !== null) {
-                    const speaker = match[1].trim();
-                    // Filter to actual speakers
-                    if (speaker.includes('Term') || speaker.includes('Policy') || speaker.length > 80) {
-                        continue;
-                    }
-                    // Only keep if it looks like a character name
-                    if (speaker.includes('Riv') || speaker.includes('Castiel') || speaker.includes('💜') || 
-                        speaker.includes("'") || speaker.includes('[')) {
-                        speakerPositions.push({
-                            speaker: speaker,
-                            start: match.index + match[0].length,
-                            matchStart: match.index
+                try {
+                    let content = e.target.result;
+                    console.log('File loaded, size:', content.length);
+                    
+                    const assistantName = document.getElementById('assistantName').value.trim();
+                    const userName = document.getElementById('userName').value.trim();
+                    console.log('Assistant name:', assistantName || '(auto-detect)');
+                    console.log('User name:', userName || '(auto-detect)');
+                    
+                    // Extract title
+                    let title = 'Conversation';
+                    const subjectMatch = content.match(/Subject:\s*(.+?)(?:\r?\n(?!\s))/s);
+                    if (subjectMatch) {
+                        let rawSubject = subjectMatch[1];
+                        rawSubject = rawSubject.replace(/=\?[^?]+\?[QB]\?([^?]+)\?=/gi, (match, encoded) => {
+                            encoded = encoded.replace(/=\r?\n\s*/g, '');
+                            return decodeQuotedPrintable(encoded);
                         });
+                        rawSubject = rawSubject.replace(/\r?\n\s*/g, '');
+                        title = rawSubject
+                            .replace(/\s*\|\s*\d+\s*memories.*$/i, '')
+                            .replace(/\s*\|\s*\d+\s*interactions.*$/i, '')
+                            .trim();
+                        title = cleanTitle(title);
                     }
-                }
-                
-                console.log(`Found ${speakerPositions.length} speaker positions`);
-                
-                // Extract content between each speaker
-                const messageBlocks = [];
-                for (let i = 0; i < speakerPositions.length; i++) {
-                    const current = speakerPositions[i];
+                    console.log('Title:', title);
                     
-                    // Get content from this speaker to next speaker (or reasonable end)
-                    let contentChunk;
-                    if (i + 1 < speakerPositions.length) {
-                        const nextPos = speakerPositions[i + 1].matchStart;
-                        contentChunk = content.substring(current.start, nextPos);
-                    } else {
-                        contentChunk = content.substring(current.start, current.start + 10000);
+                    // Find HTML and decode
+                    const htmlStartIndex = content.indexOf('<!DOCTYPE html>');
+                    if (htmlStartIndex === -1) {
+                        alert('Error: Could not find HTML content in MHTML file');
+                        return;
                     }
+                    console.log('Found HTML at index:', htmlStartIndex);
                     
-                    // Extract ALL <p> tags from this chunk
-                    const paragraphPattern = /<p class="mb-1 break-words"[^>]*>(.*?)<\/p>/gs;
-                    const paragraphs = [...contentChunk.matchAll(paragraphPattern)];
+                    content = content.substring(htmlStartIndex);
+                    content = decodeQuotedPrintable(content);
+                    console.log('Decoded content length:', content.length);
                     
-                    if (paragraphs.length > 0) {
-                        const texts = paragraphs.map(p => {
-                            let text = p[1];
-                            // Remove HTML tags (including <em>, <strong>) but keep text
-                            text = text.replace(/<[^>]+>/g, '');
-                            // Decode HTML entities
-                            text = decodeHTML(text);
-                            return text.trim();
-                        }).filter(t => t.length > 0);
-                        
-                        if (texts.length > 0) {
-                            // Determine speaker type
-                            let isAssistant = false;
-                            let isUser = false;
-                            
-                            if (assistantName && current.speaker.toLowerCase().includes(assistantName.toLowerCase())) {
-                                isAssistant = true;
-                            } else if (userName && current.speaker.toLowerCase().includes(userName.toLowerCase())) {
-                                isUser = true;
-                            } else {
-                                // Auto-detect: purple heart = assistant, otherwise user
-                                isAssistant = current.speaker.includes('💜');
-                                isUser = !isAssistant;
-                            }
-                            
-                            messageBlocks.push({
-                                speaker: isAssistant ? 'assistant' : 'user',
-                                text: texts.join('\n\n'),
-                                originalSpeaker: current.speaker,
-                                paragraphCount: texts.length
+                    // Find all speaker positions
+                    const speakerPattern = /<span>([^<]+)<\/span>/g;
+                    const speakerPositions = [];
+                    let match;
+                    
+                    while ((match = speakerPattern.exec(content)) !== null) {
+                        const speaker = match[1].trim();
+                        // Filter to actual speakers
+                        if (speaker.includes('Term') || speaker.includes('Policy') || speaker.length > 80) {
+                            continue;
+                        }
+                        // Only keep if it looks like a character name
+                        if (speaker.includes('Riv') || speaker.includes('Castiel') || speaker.includes('💜') || 
+                            speaker.includes("'") || speaker.includes('[')) {
+                            speakerPositions.push({
+                                speaker: speaker,
+                                start: match.index + match[0].length,
+                                matchStart: match.index
                             });
                         }
                     }
-                }
-                
-                console.log(`Extracted ${messageBlocks.length} message blocks`);
-                
-                // Auto-detect message order
-                let swapOrder = document.getElementById('swapOrder').checked;
-                
-                // If not manually set, auto-detect based on first two messages
-                if (!swapOrder && messageBlocks.length >= 2) {
-                    if (messageBlocks[0].speaker === 'assistant' && messageBlocks[1].speaker === 'user') {
-                        console.log('Auto-detected: Chat starts with Assistant, auto-enabling swap');
-                        swapOrder = true;
-                    }
-                }
-                
-                console.log(`Using swap order: ${swapOrder}`);
-                
-                const turns = [];
-                
-                for (let i = 0; i < messageBlocks.length; i++) {
-                    const current = messageBlocks[i];
-                    const next = messageBlocks[i + 1];
                     
-                    if (!next) break;
+                    console.log(`Found ${speakerPositions.length} speaker positions`);
                     
-                    let userMsg, assistantMsg;
-                    
-                    if (!swapOrder) {
-                        if (current.speaker === 'user' && next.speaker === 'assistant') {
-                            userMsg = current.text;
-                            assistantMsg = next.text;
-                            i++;
-                        } else {
-                            continue;
-                        }
-                    } else {
-                        if (current.speaker === 'assistant' && next.speaker === 'user') {
-                            assistantMsg = current.text;
-                            userMsg = next.text;
-                            i++;
-                        } else {
-                            continue;
-                        }
+                    if (speakerPositions.length === 0) {
+                        alert('Error: No speaker positions found. The MHTML format may not be supported.');
+                        return;
                     }
                     
-                    turns.push({
-                        conversation_id: '',
-                        creation_timestamp: turns.length,
-                        user_id: '',
-                        user_prompt: userMsg,
-                        model_responses: [assistantMsg],
-                        model_thoughts: [],
-                        update_timestamp: String(turns.length),
-                        attachments: []
-                    });
+                    // Extract content between each speaker
+                    const messageBlocks = [];
+                    for (let i = 0; i < speakerPositions.length; i++) {
+                        const current = speakerPositions[i];
+                        
+                        // Get content from this speaker to next speaker
+                        let contentChunk;
+                        if (i + 1 < speakerPositions.length) {
+                            const nextPos = speakerPositions[i + 1].matchStart;
+                            contentChunk = content.substring(current.start, nextPos);
+                        } else {
+                            contentChunk = content.substring(current.start, current.start + 10000);
+                        }
+                        
+                        // Extract ALL <p> tags from this chunk
+                        const paragraphPattern = /<p class="mb-1 break-words"[^>]*>(.*?)<\/p>/gs;
+                        const paragraphs = [...contentChunk.matchAll(paragraphPattern)];
+                        
+                        if (paragraphs.length > 0) {
+                            const texts = paragraphs.map(p => {
+                                let text = p[1];
+                                text = text.replace(/<[^>]+>/g, '');
+                                text = decodeHTML(text);
+                                return text.trim();
+                            }).filter(t => t.length > 0);
+                            
+                            if (texts.length > 0) {
+                                // Determine speaker type
+                                let isAssistant = false;
+                                let isUser = false;
+                                
+                                if (assistantName && current.speaker.toLowerCase().includes(assistantName.toLowerCase())) {
+                                    isAssistant = true;
+                                } else if (userName && current.speaker.toLowerCase().includes(userName.toLowerCase())) {
+                                    isUser = true;
+                                } else {
+                                    // Auto-detect: purple heart = assistant
+                                    isAssistant = current.speaker.includes('💜');
+                                    isUser = !isAssistant;
+                                }
+                                
+                                messageBlocks.push({
+                                    speaker: isAssistant ? 'assistant' : 'user',
+                                    text: texts.join('\n\n'),
+                                    originalSpeaker: current.speaker,
+                                    paragraphCount: texts.length
+                                });
+                            }
+                        }
+                    }
+                    
+                    console.log(`Extracted ${messageBlocks.length} message blocks`);
+                    
+                    if (messageBlocks.length === 0) {
+                        alert('Error: No message blocks could be extracted from the file.');
+                        return;
+                    }
+                    
+                    // Auto-detect message order
+                    let swapOrder = document.getElementById('swapOrder').checked;
+                    
+                    // If not manually set, auto-detect
+                    if (!swapOrder && messageBlocks.length >= 2) {
+                        if (messageBlocks[0].speaker === 'assistant' && messageBlocks[1].speaker === 'user') {
+                            console.log('Auto-detected: Chat starts with Assistant, auto-enabling swap');
+                            swapOrder = true;
+                        }
+                    }
+                    
+                    console.log(`Using swap order: ${swapOrder}`);
+                    
+                    const turns = [];
+                    
+                    for (let i = 0; i < messageBlocks.length; i++) {
+                        const current = messageBlocks[i];
+                        const next = messageBlocks[i + 1];
+                        
+                        if (!next) {
+                            console.log(`Reached end at block ${i}`);
+                            break;
+                        }
+                        
+                        let userMsg, assistantMsg;
+                        
+                        if (!swapOrder) {
+                            if (current.speaker === 'user' && next.speaker === 'assistant') {
+                                userMsg = current.text;
+                                assistantMsg = next.text;
+                                console.log(`Turn ${turns.length}: user→assistant`);
+                                i++;
+                            } else {
+                                console.log(`Skip ${i}: ${current.speaker}→${next.speaker} (expected user→assistant)`);
+                                continue;
+                            }
+                        } else {
+                            if (current.speaker === 'assistant' && next.speaker === 'user') {
+                                assistantMsg = current.text;
+                                userMsg = next.text;
+                                console.log(`Turn ${turns.length}: assistant→user`);
+                                i++;
+                            } else {
+                                console.log(`Skip ${i}: ${current.speaker}→${next.speaker} (expected assistant→user)`);
+                                continue;
+                            }
+                        }
+                        
+                        turns.push({
+                            conversation_id: '',
+                            creation_timestamp: turns.length,
+                            user_id: '',
+                            user_prompt: userMsg,
+                            model_responses: [assistantMsg],
+                            model_thoughts: [],
+                            update_timestamp: String(turns.length),
+                            attachments: []
+                        });
+                    }
+                    
+                    console.log(`Created ${turns.length} turns`);
+                    
+                    if (turns.length === 0) {
+                        alert('No conversation turns could be created. Check console (F12) for details.');
+                        return;
+                    }
+                    
+                    // Create conversation object
+                    const conversation = {
+                        conversation: {
+                            title: title,
+                            creation_timestamp: Math.floor(Date.now() / 1000),
+                            update_timestamp: Math.floor(Date.now() / 1000),
+                            token_count: 'N/A'
+                        },
+                        turns: turns
+                    };
+                    
+                    console.log('Creating JSON...');
+                    
+                    // Download JSON
+                    const jsonStr = JSON.stringify(conversation, null, 2);
+                    const blob = new Blob([jsonStr], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.json';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    
+                    URL.revokeObjectURL(url);
+                    
+                    console.log('Download triggered');
+                    
+                    // Success message
+                    document.getElementById('uploadSection').innerHTML = `
+                        <div class="upload-icon">✅</div>
+                        <h3>Conversion Complete!</h3>
+                        <p style="color: #48bb78; margin: 1rem 0;">
+                            Successfully converted ${turns.length} conversation turns
+                        </p>
+                        <p style="color: #718096; margin-bottom: 1rem;">
+                            Title: ${title}
+                        </p>
+                        <button class="btn" onclick="location.reload()">Convert Another</button>
+                    `;
+                    
+                } catch (error) {
+                    console.error('Error during processing:', error);
+                    alert('Error during conversion: ' + error.message + '\n\nCheck console (F12) for details.');
                 }
-                
-                console.log(`Created ${turns.length} turns`);
-                
-                if (turns.length === 0) {
-                    alert('No conversation turns found. Check the browser console (F12) for debugging info.');
-                    return;
-                }
-                
-                // Create conversation object
-                const conversation = {
-                    conversation: {
-                        title: title,
-                        creation_timestamp: Math.floor(Date.now() / 1000),
-                        update_timestamp: Math.floor(Date.now() / 1000),
-                        token_count: 'N/A'
-                    },
-                    turns: turns
-                };
-                
-                // Download JSON
-                const jsonStr = JSON.stringify(conversation, null, 2);
-                const blob = new Blob([jsonStr], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.json';
-                a.click();
-                
-                URL.revokeObjectURL(url);
-                
-                // Success message
-                document.getElementById('uploadSection').innerHTML = `
-                    <div class="upload-icon">✅</div>
-                    <h3>Conversion Complete!</h3>
-                    <p style="color: #48bb78; margin: 1rem 0;">
-                        Successfully converted ${turns.length} conversation turns
-                    </p>
-                    <p style="color: #718096; margin-bottom: 1rem;">
-                        Title: ${title}
-                    </p>
-                    <button class="btn" onclick="location.reload()">Convert Another</button>
-                `;
+            };
+            
+            reader.onerror = function(error) {
+                console.error('Error reading file:', error);
+                alert('Error reading file: ' + error);
             };
             
             reader.readAsText(file);
