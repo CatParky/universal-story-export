@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat MHTML to JSON Converter</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 2rem;
+        }
+
+        .upload-section {
+            border: 3px dashed #cbd5e0;
+            border-radius: 12px;
+            padding: 3rem;
+            text-align: center;
+            background: #f3e8ff;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            margin-bottom: 2rem;
+        }
+
+        .upload-section:hover {
+            border-color: #667eea;
+            background: #ede9fe;
+        }
+
+        .upload-section.dragover {
+            border-color: #667eea;
+            background: #e6fffa;
+            transform: scale(1.02);
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .upload-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: transform 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status {
+            margin-top: 2rem;
+            padding: 1rem;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+
+        .instructions {
+            background: #f7fafc;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-top: 2rem;
+        }
+
+        .instructions h3 {
+            color: #2d3748;
+            margin-bottom: 1rem;
+        }
+
+        .instructions ol {
+            margin-left: 1.5rem;
+        }
+
+        .instructions li {
+            margin-bottom: 0.5rem;
+            color: #4a5568;
+        }
+
+        .info-box {
+            background: #fff7ed;
+            border-left: 4px solid #f59e0b;
+            padding: 1rem;
+            margin-top: 1rem;
+            border-radius: 4px;
+        }
+
+        .info-box p {
+            color: #78350f;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💜 Chat MHTML to JSON Converter</h1>
+            <p>Convert saved chat exports for use with Story Extractor</p>
+            <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.8;">Version 1.0 • 18 February 2026</p>
+        </div>
+
+        <div class="content">
+            <div class="upload-section" id="uploadSection">
+                <div class="upload-icon">📁</div>
+                <h3>Drop your chat MHTML file here</h3>
+                <p style="margin: 1rem 0; color: #718096;">or</p>
+                <button class="btn" onclick="document.getElementById('fileInput').click()">Choose File</button>
+                <input type="file" id="fileInput" accept=".mhtml,.mht">
+            </div>
+
+            <div class="status" id="status"></div>
+
+            <div class="instructions">
+                <h3>📝 How to use:</h3>
+                <ol>
+                    <li>In your chat platform, open the conversation you want to export</li>
+                    <li>Right-click anywhere on the page → <strong>Save As</strong></li>
+                    <li>Choose format: <strong>Webpage, Complete</strong> or <strong>MHTML</strong></li>
+                    <li>Upload that saved file here</li>
+                    <li>Download the resulting JSON file</li>
+                    <li>Upload the JSON to <a href="https://catparky.github.io/universal-story-extract/" target="_blank">Story Extractor</a></li>
+                </ol>
+
+                <div class="info-box">
+                    <p><strong>Privacy note:</strong> All processing happens in your browser. No data is uploaded to any server.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const uploadSection = document.getElementById('uploadSection');
+        const fileInput = document.getElementById('fileInput');
+        const status = document.getElementById('status');
+
+        // Drag and drop handlers
+        uploadSection.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadSection.classList.add('dragover');
+        });
+
+        uploadSection.addEventListener('dragleave', () => {
+            uploadSection.classList.remove('dragover');
+        });
+
+        uploadSection.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        });
+
+        function decodeQuotedPrintable(text) {
+            // Remove soft line breaks
+            text = text.replace(/=\r\n/g, '');
+            text = text.replace(/=\n/g, '');
+            
+            // Decode =XX sequences
+            text = text.replace(/=([0-9A-F]{2})/g, (match, hex) => {
+                return String.fromCharCode(parseInt(hex, 16));
+            });
+            
+            return text;
+        }
+
+        function unescapeHtml(text) {
+            const textarea = document.createElement('textarea');
+            textarea.innerHTML = text;
+            return textarea.value;
+        }
+
+        function handleFile(file) {
+            const reader = new FileReader();
+            
+            reader.onload = (e) => {
+                try {
+                    const content = e.target.result;
+                    
+                    // Extract title from various possible locations
+                    let chatTitle = "Chat Export";
+                    
+                    // Try to find title in various formats
+                    const titleMatches = [
+                        content.match(/<title>([^<]+)<\/title>/),
+                        content.match(/Gale Dekarios \[([^\]]+)\]/),
+                        content.match(/\[([^\]]+)\]\|/),
+                    ];
+                    
+                    for (const match of titleMatches) {
+                        if (match && match[0]) {
+                            chatTitle = match[0].replace(/<\/?title>/g, '').trim();
+                            // Clean up common patterns
+                            chatTitle = chatTitle.replace(/\|\s*\d+\s*memories.*$/i, '').trim();
+                            break;
+                        }
+                    }
+                    
+                    // Find all message containers
+                    const messageRegex = /<p class=3D"mb-1 break-words">(.*?)<\/p>/gs;
+                    const messages = [];
+                    let match;
+                    
+                    while ((match = messageRegex.exec(content)) !== null) {
+                        messages.push(match[1]);
+                    }
+                    
+                    // Process messages into turns
+                    const turns = [];
+                    let currentUserMsg = null;
+                    
+                    messages.forEach((msg, i) => {
+                        // Decode the message
+                        msg = decodeQuotedPrintable(msg);
+                        msg = unescapeHtml(msg);
+                        
+                        // Remove HTML tags
+                        msg = msg.replace(/<em[^>]*>/g, '');
+                        msg = msg.replace(/<\/em>/g, '');
+                        msg = msg.replace(/<[^>]+>/g, '');
+                        
+                        // Clean up whitespace
+                        msg = msg.replace(/\s+/g, ' ').trim();
+                        
+                        if (!msg) return;
+                        
+                        // Alternate between user and assistant
+                        if (i % 2 === 0) {
+                            currentUserMsg = msg;
+                        } else {
+                            if (currentUserMsg) {
+                                turns.push({
+                                    conversation_id: "",
+                                    creation_timestamp: Math.floor(i / 2),
+                                    user_id: "",
+                                    user_prompt: currentUserMsg,
+                                    model_responses: [msg],
+                                    model_thoughts: [],
+                                    update_timestamp: String(Math.floor(i / 2)),
+                                    attachments: []
+                                });
+                                currentUserMsg = null;
+                            }
+                        }
+                    });
+                    
+                    // Create conversation structure
+                    const conversationData = {
+                        conversation: {
+                            title: chatTitle,
+                            creation_timestamp: Math.floor(Date.now() / 1000),
+                            update_timestamp: Math.floor(Date.now() / 1000),
+                            token_count: "N/A"
+                        },
+                        turns: turns
+                    };
+                    
+                    // Download the JSON
+                    const json = JSON.stringify(conversationData, null, 2);
+                    const blob = new Blob([json], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = file.name.replace(/\.mhtml?$/i, '.json');
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    
+                    // Show success message
+                    status.className = 'status success';
+                    status.innerHTML = `
+                        ✓ Success! Extracted ${turns.length} turns<br>
+                        Downloaded: ${a.download}<br>
+                        <strong>Next step:</strong> Upload this JSON to <a href="https://catparky.github.io/universal-story-extract/" target="_blank">Story Extractor</a>
+                    `;
+                    
+                } catch (error) {
+                    status.className = 'status error';
+                    status.textContent = `✗ Error: ${error.message}`;
+                    console.error(error);
+                }
+            };
+            
+            reader.readAsText(file);
+        }
+    </script>
+</body>
+</html>
