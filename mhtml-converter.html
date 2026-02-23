@@ -238,7 +238,7 @@
             const reader = new FileReader();
             
             reader.onload = function(e) {
-                const content = e.target.result;
+                let content = e.target.result;
                 
                 // Extract title from Subject header with proper MIME decoding
                 let title = 'Conversation';
@@ -264,7 +264,16 @@
                         .trim();
                 }
                 
-                // Extract messages
+                // Find the HTML content section (after the headers)
+                const htmlStartIndex = content.indexOf('<!DOCTYPE html>');
+                if (htmlStartIndex !== -1) {
+                    content = content.substring(htmlStartIndex);
+                }
+                
+                // Decode the entire HTML content from quoted-printable
+                content = decodeQuotedPrintable(content);
+                
+                // Extract messages using the decoded HTML
                 const messagePattern = /<p class="mb-1 break-words"[^>]*>(.*?)<\/p>/gs;
                 const matches = [...content.matchAll(messagePattern)];
                 
