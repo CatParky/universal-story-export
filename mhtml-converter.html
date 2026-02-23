@@ -180,7 +180,7 @@
             </div>
             <h1>💜 Chat MHTML to JSON Converter</h1>
             <p>Convert saved chat exports for use with Story Extractor</p>
-            <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.8;">Version 1.4 • 23 February 2026</p>
+            <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.8;">Version 1.5 • 23 February 2026</p>
         </div>
 
         <div class="content">
@@ -371,6 +371,19 @@
                                 let text = p[1];
                                 text = text.replace(/<[^>]+>/g, '');
                                 text = decodeHTML(text);
+                                
+                                // Fix UTF-8 encoding artifacts
+                                text = text.replace(/â/g, '—');      // Em dash
+                                text = text.replace(/â€™/g, "'");    // Apostrophe
+                                text = text.replace(/â€œ/g, '"');    // Opening quote
+                                text = text.replace(/â€/g, '"');     // Closing quote
+                                text = text.replace(/â€¦/g, '…');    // Ellipsis
+                                text = text.replace(/Â/g, '');       // Non-breaking space artifact
+                                
+                                // Fix missing spaces
+                                text = text.replace(/([.!?,;:"])([A-Z])/g, '$1 $2');
+                                text = text.replace(/([a-z])([A-Z])/g, '$1 $2');
+                                
                                 return text.trim();
                             }).filter(t => t.length > 0);
                             
@@ -379,14 +392,22 @@
                                 let isAssistant = false;
                                 let isUser = false;
                                 
-                                if (assistantName && current.speaker.toLowerCase().includes(assistantName.toLowerCase())) {
+                                const speakerLower = current.speaker.toLowerCase();
+                                const assistantLower = assistantName.toLowerCase();
+                                const userLower = userName.toLowerCase();
+                                
+                                // Check if names match (either way - speaker contains name OR name contains speaker)
+                                if (assistantName && (speakerLower.includes(assistantLower) || assistantLower.includes(speakerLower))) {
                                     isAssistant = true;
-                                } else if (userName && current.speaker.toLowerCase().includes(userName.toLowerCase())) {
+                                    console.log(`  "${current.speaker}" matched as ASSISTANT (via "${assistantName}")`);
+                                } else if (userName && (speakerLower.includes(userLower) || userLower.includes(speakerLower))) {
                                     isUser = true;
+                                    console.log(`  "${current.speaker}" matched as USER (via "${userName}")`);
                                 } else {
                                     // Auto-detect: purple heart = assistant
                                     isAssistant = current.speaker.includes('💜');
                                     isUser = !isAssistant;
+                                    console.log(`  "${current.speaker}" auto-detected as ${isAssistant ? 'ASSISTANT' : 'USER'}`);
                                 }
                                 
                                 messageBlocks.push({
