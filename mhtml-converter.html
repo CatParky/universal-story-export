@@ -271,19 +271,19 @@
             // CRITICAL: Must be called BEFORE stripping control characters
             return text
                 // Em dash + control code + punctuation combinations
-                .replace(/\u2014\u0080\u009c/g, '"')    // —\u0080\u009c → " (left double quote)
-                .replace(/\u2014\u0080\u009d/g, '"')    // —\u0080\u009d → " (right double quote)
-                .replace(/\u2014\u0080\u0099/g, "'")    // —\u0080\u0099 → ' (right single quote/apostrophe)
-                .replace(/\u2014\u0080\u0098/g, "'")    // —\u0080\u0098 → ' (left single quote)
-                .replace(/\u2014\u0080\u0085/g, '…')    // —\u0080\u0085 → … (ellipsis)
-                .replace(/\u2014\u0080\u00a6/g, '…')    // —\u0080¦ → … (broken ellipsis)
+                .replace(/\u2014\u0080\u009c/g, '\u201c')    // —\u0080\u009c → " (left double quote)
+                .replace(/\u2014\u0080\u009d/g, '\u201d')    // —\u0080\u009d → " (right double quote)
+                .replace(/\u2014\u0080\u0099/g, '\u2019')    // —\u0080\u0099 → ' (right single quote/apostrophe)
+                .replace(/\u2014\u0080\u0098/g, '\u2018')    // —\u0080\u0098 → ' (left single quote)
+                .replace(/\u2014\u0080\u0085/g, '\u2026')    // —\u0080\u0085 → … (ellipsis)
+                .replace(/\u2014\u0080\u00a6/g, '\u2026')    // —\u0080¦ → … (broken ellipsis)
                 // Standalone control code artifacts (without em dash)
-                .replace(/\u0084/g, '„')                // „ (low double quote)
-                .replace(/\u0091/g, ''')                // ' (left single quote)
-                .replace(/\u0092/g, ''')                // ' (right single quote)
-                .replace(/\u0093/g, '"')                // " (left double quote)
-                .replace(/\u0094/g, '"')                // " (right double quote)
-                .replace(/\u0085/g, '…');               // … (ellipsis)
+                .replace(/\u0084/g, '\u201e')                // „ (low double quote)
+                .replace(/\u0091/g, '\u2018')                // ' (left single quote)
+                .replace(/\u0092/g, '\u2019')                // ' (right single quote)
+                .replace(/\u0093/g, '\u201c')                // " (left double quote)
+                .replace(/\u0094/g, '\u201d')                // " (right double quote)
+                .replace(/\u0085/g, '\u2026');               // … (ellipsis)
         }
 
         function cleanTitle(title) {
