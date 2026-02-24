@@ -180,7 +180,7 @@
             </div>
             <h1>💜 Chat MHTML to JSON Converter</h1>
             <p>Convert saved chat exports for use with Story Extractor</p>
-            <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.8;">Version 1.6 • 23 February 2026</p>
+            <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.8;">Version 1.7 • 24 February 2026</p>
         </div>
 
         <div class="content">
@@ -264,6 +264,26 @@
             const textarea = document.createElement('textarea');
             textarea.innerHTML = text;
             return textarea.value;
+        }
+
+        function fixWin1252Artifacts(text) {
+            // Map Windows-1252 control code artifacts to proper Unicode punctuation
+            // CRITICAL: Must be called BEFORE stripping control characters
+            return text
+                // Em dash + control code + punctuation combinations
+                .replace(/\u2014\u0080\u009c/g, '"')    // —\u0080\u009c → " (left double quote)
+                .replace(/\u2014\u0080\u009d/g, '"')    // —\u0080\u009d → " (right double quote)
+                .replace(/\u2014\u0080\u0099/g, "'")    // —\u0080\u0099 → ' (right single quote/apostrophe)
+                .replace(/\u2014\u0080\u0098/g, "'")    // —\u0080\u0098 → ' (left single quote)
+                .replace(/\u2014\u0080\u0085/g, '…')    // —\u0080\u0085 → … (ellipsis)
+                .replace(/\u2014\u0080\u00a6/g, '…')    // —\u0080¦ → … (broken ellipsis)
+                // Standalone control code artifacts (without em dash)
+                .replace(/\u0084/g, '„')                // „ (low double quote)
+                .replace(/\u0091/g, ''')                // ' (left single quote)
+                .replace(/\u0092/g, ''')                // ' (right single quote)
+                .replace(/\u0093/g, '"')                // " (left double quote)
+                .replace(/\u0094/g, '"')                // " (right double quote)
+                .replace(/\u0085/g, '…');               // … (ellipsis)
         }
 
         function cleanTitle(title) {
@@ -373,20 +393,16 @@
                         if (paragraphs.length > 0) {
                             const texts = paragraphs.map(p => {
                                 let text = p[1];
+                                // Remove HTML tags
                                 text = text.replace(/<[^>]+>/g, '');
+                                // Decode HTML entities
                                 text = decodeHTML(text);
                                 
-                                // Remove ALL control characters (U+0080-U+009F)
-                                text = text.replace(/[\u0080-\u009F]/g, '');
+                                // FIX Windows-1252 artifacts FIRST (before removing control chars!)
+                                text = fixWin1252Artifacts(text);
                                 
-                                // Now clean up the remaining characters
-                                // After removing control chars, "—" followed by punctuation becomes just punctuation
-                                text = text.replace(/—"/g, '"');      // Em dash + quote = quote
-                                text = text.replace(/—"/g, '"');      // Em dash + quote = quote
-                                text = text.replace(/—'/g, "'");      // Em dash + apostrophe = apostrophe
-                                text = text.replace(/—'/g, "'");      // Em dash + apostrophe = apostrophe
-                                text = text.replace(/—¦/g, '…');      // Em dash + broken ellipsis = ellipsis
-                                text = text.replace(/—…/g, '…');      // Em dash + ellipsis = ellipsis
+                                // NOW remove remaining control characters
+                                text = text.replace(/[\u0080-\u009F]/g, '');
                                 
                                 // Standard UTF-8 artifact fixes
                                 text = text.replace(/â€"/g, '—');
