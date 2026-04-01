@@ -180,45 +180,64 @@
             </div>
             <h1>💜 Chat MHTML to JSON Converter</h1>
             <p>Convert saved chat exports for use with Story Extractor</p>
-            <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.8;">Version 1.7 • 24 February 2026</p>
+            <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.8;">Version 2.0 • 1 April 2026</p>
         </div>
 
         <div class="content">
+            <div class="instructions">
+                <h3>📋 How to Use</h3>
+                <ol>
+                    <li>Save your chat page as MHTML (File → Save Page As → Webpage, Single File)</li>
+                    <li><strong>Required:</strong> Enter the character names EXACTLY as they appear in the chat</li>
+                    <li>Drop the .mhtml file below or click "Choose File"</li>
+                    <li>The converted JSON will download automatically</li>
+                    <li>Upload the JSON to <a href="https://catparky.github.io/universal-story-export/index.html" target="_blank">Story Extractor</a></li>
+                </ol>
+                <p style="margin-top: 1rem; padding: 0.75rem; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px; color: #856404;">
+                    <strong>💡 How the Name Fields Work:</strong><br>
+                    • <strong>Character Name</strong> - copy EXACTLY from your chat (used for matching)<br>
+                    • <strong>Show Name As</strong> - clean version for the JSON output (optional)<br><br>
+                    <strong>Examples:</strong><br>
+                    • Match: "💜 Gale Dekarios [Only One Bed]" → Show As: "Gale Dekarios"<br>
+                    • Match: "River 'Riv'" → Show As: "Riv High-Hill"<br>
+                    • Match: "Theo" → Show As: "Theo Stirling"
+                </p>
+            </div>
+
             <div class="upload-section" id="uploadSection">
+                <div class="options-section" style="margin-bottom: 1.5rem;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div>
+                            <label><strong>Assistant Character Name *</strong> (for matching)</label>
+                            <input type="text" id="assistantName" placeholder="e.g., Theo, 💜 Gale" required>
+                            <p class="help-text">Copy from chat EXACTLY</p>
+                        </div>
+                        <div>
+                            <label><strong>Show Name As</strong> (clean output)</label>
+                            <input type="text" id="assistantDisplayName" placeholder="e.g., Gale Dekarios">
+                            <p class="help-text">Clean name for JSON (optional)</p>
+                        </div>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div>
+                            <label><strong>Your Character Name *</strong> (for matching)</label>
+                            <input type="text" id="userName" placeholder="e.g., River 'Riv'" required>
+                            <p class="help-text">Copy from chat EXACTLY</p>
+                        </div>
+                        <div>
+                            <label><strong>Show Name As</strong> (clean output)</label>
+                            <input type="text" id="userDisplayName" placeholder="e.g., Riv High-Hill">
+                            <p class="help-text">Clean name for JSON (optional)</p>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="upload-icon">📁</div>
                 <h3>Drop your chat MHTML file here</h3>
                 <p style="margin: 1rem 0; color: #718096;">or</p>
                 <button class="btn" onclick="document.getElementById('fileInput').click()">Choose File</button>
                 <input type="file" id="fileInput" accept=".mhtml,.mht">
-                
-                <div class="options-section">
-                    <label>Assistant Character Name (e.g., Castiel, Gale)</label>
-                    <input type="text" id="assistantName" placeholder="Leave blank to auto-detect">
-                    <p class="help-text">If provided, messages will be identified as Assistant when the speaker contains this name</p>
-                    
-                    <label style="margin-top: 0.5rem;">User Character Name (e.g., Riv, River)</label>
-                    <input type="text" id="userName" placeholder="Leave blank to auto-detect">
-                    <p class="help-text">If provided, messages will be identified as User when the speaker contains this name</p>
-                    
-                    <div class="checkbox-option">
-                        <label>
-                            <input type="checkbox" id="swapOrder">
-                            <span>Swap message order (Assistant first, then User)</span>
-                        </label>
-                    </div>
-                </div>
-            </div>
-
-            <div class="instructions">
-                <h3>📋 How to Use</h3>
-                <ol>
-                    <li>Save your chat page as MHTML (File → Save Page As → Webpage, Single File)</li>
-                    <li><strong>Optional:</strong> Enter character names to help identify speakers (otherwise auto-detect)</li>
-                    <li>Check "Swap message order" if your chat has the assistant speaking first</li>
-                    <li>Drop the .mhtml file above or click "Choose File"</li>
-                    <li>The converted JSON will download automatically</li>
-                    <li>Upload the JSON to <a href="https://catparky.github.io/universal-story-export/index.html" target="_blank">Story Extractor</a></li>
-                </ol>
             </div>
         </div>
     </div>
@@ -297,6 +316,22 @@
         }
 
         function processFile(file) {
+            // Validate required fields
+            const assistantName = document.getElementById('assistantName').value.trim();
+            const userName = document.getElementById('userName').value.trim();
+            
+            if (!assistantName || !userName) {
+                alert('Please enter both character names before uploading the file.\n\nCopy them exactly as they appear in your chat!');
+                return;
+            }
+            
+            // Get display names (optional - defaults to match names if not provided)
+            const assistantDisplayName = document.getElementById('assistantDisplayName').value.trim() || assistantName;
+            const userDisplayName = document.getElementById('userDisplayName').value.trim() || userName;
+            
+            console.log('Match names:', { assistantName, userName });
+            console.log('Display names:', { assistantDisplayName, userDisplayName });
+            
             const reader = new FileReader();
             
             reader.onload = function(e) {
@@ -329,6 +364,19 @@
                             .trim();
                         title = cleanTitle(title);
                     }
+                    
+                    // If we have a clean display name, use it in the title
+                    if (assistantDisplayName && assistantDisplayName !== assistantName) {
+                        // Replace the assistant name in the title with the display name
+                        const cleanedAssistant = cleanTitle(assistantName);
+                        if (title.includes(cleanedAssistant)) {
+                            title = title.replace(cleanedAssistant, assistantDisplayName);
+                        } else {
+                            // If cleaned version doesn't match, just use display name
+                            title = assistantDisplayName;
+                        }
+                    }
+                    
                     console.log('Title:', title);
                     
                     // Find HTML and decode
@@ -350,13 +398,47 @@
                     
                     while ((match = speakerPattern.exec(content)) !== null) {
                         const speaker = match[1].trim();
-                        // Filter to actual speakers
-                        if (speaker.includes('Term') || speaker.includes('Policy') || speaker.length > 80) {
+                        
+                        // Skip navigation/policy links and UI elements
+                        if (speaker.includes('Term') || speaker.includes('Policy') || 
+                            speaker.includes('Guidelines') || speaker.includes('Program') ||
+                            speaker.includes('Chat') || speaker.includes('Upgrade') ||
+                            speaker.includes('Current') || speaker.includes('Continue') ||
+                            speaker.includes('Plan') || speaker.includes('Setting') ||
+                            speaker.includes('Detail') || speaker.includes('Edit') ||
+                            speaker.includes('Memory') || speaker.includes('Memories') ||
+                            speaker.includes('Summarize') || speaker.includes('Pinned') ||
+                            speaker.includes('Unfiltered') || speaker.includes('Rec.') ||
+                            speaker.includes('Scene') || speaker.includes('Instruction') ||
+                            speaker.includes('Voice') || speaker.includes('Group') ||
+                            speaker.includes('Medium') || speaker.includes('High') ||
+                            speaker.includes('Save') || speaker.includes('View')) {
                             continue;
                         }
-                        // Only keep if it looks like a character name
-                        if (speaker.includes('Riv') || speaker.includes('Castiel') || speaker.includes('💜') || 
-                            speaker.includes("'") || speaker.includes('[')) {
+                        
+                        // Skip very long text (likely not a speaker name)
+                        if (speaker.length > 80) {
+                            continue;
+                        }
+                        
+                        // Skip very short (1-2 chars) or numbers/model names
+                        if (speaker.length <= 2 || /^\d+\/\d+$/.test(speaker) || 
+                            speaker.includes('8K') || speaker.includes('Flash') || 
+                            speaker.includes('Gemini') || speaker.includes('Ultra') ||
+                            speaker.includes('DS R') || speaker.includes('Tau') ||
+                            speaker.includes('loaded')) {
+                            continue;
+                        }
+                        
+                        // ACCEPT if it looks like a character name:
+                        // - Contains character markers (emoji, brackets, quotes)
+                        // - OR is a reasonable name length (3-40 chars, starts with capital letter)
+                        const hasMarkers = speaker.includes('💜') || speaker.includes('[') || 
+                                          speaker.includes("'") || speaker.includes('"');
+                        const isReasonableName = speaker.length >= 3 && speaker.length <= 40 && 
+                                                /^[A-Z]/.test(speaker);
+                        
+                        if (hasMarkers || isReasonableName) {
                             speakerPositions.push({
                                 speaker: speaker,
                                 start: match.index + match[0].length,
@@ -368,7 +450,17 @@
                     console.log(`Found ${speakerPositions.length} speaker positions`);
                     
                     if (speakerPositions.length === 0) {
-                        alert('Error: No speaker positions found. The MHTML format may not be supported.');
+                        // DEBUG: Let's see what we're filtering out
+                        console.log('DEBUG: No speakers found after filtering. Checking all <span> tags...');
+                        const allSpans = [...content.matchAll(speakerPattern)];
+                        console.log(`Total <span> tags found: ${allSpans.length}`);
+                        console.log('First 20 <span> contents:');
+                        allSpans.slice(0, 20).forEach((match, i) => {
+                            const text = match[1].trim();
+                            console.log(`  ${i}: "${text.substring(0, 80)}" (len: ${text.length})`);
+                        });
+                        
+                        alert('Error: No speaker positions found. The MHTML format may not be supported.\n\nCheck the console (F12) to see what <span> tags were found.');
                         return;
                     }
                     
@@ -446,8 +538,12 @@
                                     console.log(`  "${current.speaker}" auto-detected as ${isAssistant ? 'ASSISTANT' : 'USER'}`);
                                 }
                                 
+                                // Use display name if provided, otherwise use original speaker name
+                                const displayName = isAssistant ? assistantDisplayName : userDisplayName;
+                                
                                 messageBlocks.push({
                                     speaker: isAssistant ? 'assistant' : 'user',
+                                    displayName: displayName,
                                     text: texts.join('\n\n'),
                                     originalSpeaker: current.speaker,
                                     paragraphCount: texts.length
