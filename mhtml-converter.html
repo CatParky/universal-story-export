@@ -180,7 +180,7 @@
             </div>
             <h1>💜 Chat MHTML to JSON Converter</h1>
             <p>Convert saved chat exports for use with Story Extractor</p>
-            <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.8;">Version 2.0 • 1 April 2026</p>
+            <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.8;">Version 2.1 • 1 April 2026</p>
         </div>
 
         <div class="content">
@@ -464,106 +464,127 @@
                         return;
                     }
                     
-                    // Extract content between each speaker
+                    // NEW APPROACH: Extract ALL messages and assign speakers based on proximity
                     const messageBlocks = [];
-                    for (let i = 0; i < speakerPositions.length; i++) {
-                        const current = speakerPositions[i];
-                        
-                        // Get content from this speaker to next speaker
-                        let contentChunk;
-                        if (i + 1 < speakerPositions.length) {
-                            const nextPos = speakerPositions[i + 1].matchStart;
-                            contentChunk = content.substring(current.start, nextPos);
-                        } else {
-                            contentChunk = content.substring(current.start, current.start + 10000);
-                        }
-                        
-                        // Extract ALL <p> tags from this chunk
-                        const paragraphPattern = /<p class="mb-1 break-words"[^>]*>(.*?)<\/p>/gs;
-                        const paragraphs = [...contentChunk.matchAll(paragraphPattern)];
-                        
-                        if (paragraphs.length > 0) {
-                            const texts = paragraphs.map(p => {
-                                let text = p[1];
-                                // Remove HTML tags
-                                text = text.replace(/<[^>]+>/g, '');
-                                // Decode HTML entities
-                                text = decodeHTML(text);
-                                
-                                // FIX Windows-1252 artifacts FIRST (before removing control chars!)
-                                text = fixWin1252Artifacts(text);
-                                
-                                // NOW remove remaining control characters
-                                text = text.replace(/[\u0080-\u009F]/g, '');
-                                
-                                // Standard UTF-8 artifact fixes
-                                text = text.replace(/â€"/g, '—');
-                                text = text.replace(/â€™/g, "'");
-                                text = text.replace(/â€œ/g, '"');
-                                text = text.replace(/â€/g, '"');
-                                text = text.replace(/â€¦/g, '…');
-                                text = text.replace(/Â/g, '');
-                                text = text.replace(/â/g, '—');
-                                
-                                // Fix missing spaces
-                                text = text.replace(/([.!?,;:"])([A-Z])/g, '$1 $2');
-                                text = text.replace(/([a-z])([A-Z])/g, '$1 $2');
-                                
-                                // Clean up multiple spaces
-                                text = text.replace(/\s+/g, ' ');
-                                
-                                return text.trim();
-                            }).filter(t => t.length > 0);
-                            
-                            if (texts.length > 0) {
-                                // Determine speaker type
-                                let isAssistant = false;
-                                let isUser = false;
-                                
-                                const speakerLower = current.speaker.toLowerCase();
-                                const assistantLower = assistantName.toLowerCase();
-                                const userLower = userName.toLowerCase();
-                                
-                                // Check if names match (either way - speaker contains name OR name contains speaker)
-                                if (assistantName && (speakerLower.includes(assistantLower) || assistantLower.includes(speakerLower))) {
-                                    isAssistant = true;
-                                    console.log(`  "${current.speaker}" matched as ASSISTANT (via "${assistantName}")`);
-                                } else if (userName && (speakerLower.includes(userLower) || userLower.includes(speakerLower))) {
-                                    isUser = true;
-                                    console.log(`  "${current.speaker}" matched as USER (via "${userName}")`);
-                                } else {
-                                    // Auto-detect: purple heart = assistant
-                                    isAssistant = current.speaker.includes('💜');
-                                    isUser = !isAssistant;
-                                    console.log(`  "${current.speaker}" auto-detected as ${isAssistant ? 'ASSISTANT' : 'USER'}`);
-                                }
-                                
-                                // Use display name if provided, otherwise use original speaker name
-                                const displayName = isAssistant ? assistantDisplayName : userDisplayName;
-                                
-                                messageBlocks.push({
-                                    speaker: isAssistant ? 'assistant' : 'user',
-                                    displayName: displayName,
-                                    text: texts.join('\n\n'),
-                                    originalSpeaker: current.speaker,
-                                    paragraphCount: texts.length
-                                });
-                            }
-                        }
-                    }
                     
-                    console.log(`Extracted ${messageBlocks.length} message blocks`);
+                    // Find ALL message paragraphs with their positions
+                    const allMessagePattern = /<p class="mb-1 break-words"[^>]*>(.*?)<\/p>/gs;
+                    const allMessages = [...content.matchAll(allMessagePattern)];
                     
-                    if (messageBlocks.length === 0) {
-                        alert('Error: No message blocks could be extracted from the file.');
+                    console.log(`Found ${allMessages.length} total message paragraphs`);
+                    
+                    if (allMessages.length === 0) {
+                        alert('Error: No message paragraphs found in the file.');
                         return;
                     }
                     
-                    // Auto-detect message order based on first two messages
+                    // For each message, find the closest preceding speaker tag
+                    for (let msgMatch of allMessages) {
+                        const msgPos = msgMatch.index;
+                        
+                        // Find the most recent speaker tag BEFORE this message
+                        let closestSpeaker = null;
+                        let closestDistance = Infinity;
+                        
+                        for (let sp of speakerPositions) {
+                            if (sp.matchStart < msgPos) {
+                                const distance = msgPos - sp.matchStart;
+                                // Only consider tags within 5000 chars (same speaker block)
+                                if (distance < closestDistance && distance < 5000) {
+                                    closestDistance = distance;
+                                    closestSpeaker = sp.speaker;
+                                }
+                            }
+                        }
+                        
+                        // Clean the message text
+                        let text = msgMatch[1];
+                        text = text.replace(/<[^>]+>/g, '');
+                        text = decodeHTML(text);
+                        text = fixWin1252Artifacts(text);
+                        text = text.replace(/[\u0080-\u009F]/g, '');
+                        text = text.replace(/â€"/g, '—');
+                        text = text.replace(/â€™/g, "'");
+                        text = text.replace(/â€œ/g, '"');
+                        text = text.replace(/â€/g, '"');
+                        text = text.replace(/â€¦/g, '…');
+                        text = text.replace(/Â/g, '');
+                        text = text.replace(/â/g, '—');
+                        text = text.replace(/([.!?,;:"])([A-Z])/g, '$1 $2');
+                        text = text.replace(/([a-z])([A-Z])/g, '$1 $2');
+                        text = text.replace(/\s+/g, ' ');
+                        text = text.trim();
+                        
+                        if (text.length === 0) continue;
+                        
+                        // Determine if this is assistant or user
+                        let isAssistant = false;
+                        
+                        if (closestSpeaker) {
+                            // Has a speaker tag - check if it matches assistant
+                            const speakerLower = closestSpeaker.toLowerCase();
+                            const assistantLower = assistantName.toLowerCase();
+                            
+                            if (speakerLower.includes(assistantLower) || assistantLower.includes(speakerLower)) {
+                                isAssistant = true;
+                            }
+                            // If doesn't match assistant, it's user (old format with user tags)
+                        } else {
+                            // No speaker tag - assume USER (new CrushOn format)
+                            isAssistant = false;
+                        }
+                        
+                        const displayName = isAssistant ? assistantDisplayName : userDisplayName;
+                        
+                        messageBlocks.push({
+                            speaker: isAssistant ? 'assistant' : 'user',
+                            displayName: displayName,
+                            text: text,
+                            originalSpeaker: closestSpeaker || '(no tag)',
+                            position: msgPos
+                        });
+                    }
+                    
+                    console.log(`Extracted ${messageBlocks.length} individual message paragraphs`);
+                    
+                    // GROUP consecutive messages from the same speaker into turns
+                    const groupedBlocks = [];
+                    let currentGroup = null;
+                    
+                    for (let block of messageBlocks) {
+                        if (!currentGroup || currentGroup.speaker !== block.speaker) {
+                            // Start new group
+                            if (currentGroup) {
+                                groupedBlocks.push(currentGroup);
+                            }
+                            currentGroup = {
+                                speaker: block.speaker,
+                                displayName: block.displayName,
+                                text: block.text,
+                                originalSpeaker: block.originalSpeaker
+                            };
+                        } else {
+                            // Add to current group (multi-paragraph turn)
+                            currentGroup.text += '\n\n' + block.text;
+                        }
+                    }
+                    // Don't forget the last group
+                    if (currentGroup) {
+                        groupedBlocks.push(currentGroup);
+                    }
+                    
+                    console.log(`Grouped into ${groupedBlocks.length} multi-paragraph turns`);
+                    
+                    if (groupedBlocks.length === 0) {
+                        alert('No conversation turns could be created. Check console (F12) for details.');
+                        return;
+                    }
+                    
+                    // Auto-detect message order based on first two turns
                     let swapOrder = false;
                     
-                    if (messageBlocks.length >= 2) {
-                        if (messageBlocks[0].speaker === 'assistant' && messageBlocks[1].speaker === 'user') {
+                    if (groupedBlocks.length >= 2) {
+                        if (groupedBlocks[0].speaker === 'assistant' && groupedBlocks[1].speaker === 'user') {
                             console.log('Auto-detected: Chat starts with Assistant, enabling swap');
                             swapOrder = true;
                         }
@@ -573,9 +594,9 @@
                     
                     const turns = [];
                     
-                    for (let i = 0; i < messageBlocks.length; i++) {
-                        const current = messageBlocks[i];
-                        const next = messageBlocks[i + 1];
+                    for (let i = 0; i < groupedBlocks.length; i++) {
+                        const current = groupedBlocks[i];
+                        const next = groupedBlocks[i + 1];
                         
                         if (!next) {
                             console.log(`Reached end at block ${i}`);
