@@ -559,13 +559,12 @@
                         return;
                     }
                     
-                    // Auto-detect message order
-                    let swapOrder = document.getElementById('swapOrder').checked;
+                    // Auto-detect message order based on first two messages
+                    let swapOrder = false;
                     
-                    // If not manually set, auto-detect
-                    if (!swapOrder && messageBlocks.length >= 2) {
+                    if (messageBlocks.length >= 2) {
                         if (messageBlocks[0].speaker === 'assistant' && messageBlocks[1].speaker === 'user') {
-                            console.log('Auto-detected: Chat starts with Assistant, auto-enabling swap');
+                            console.log('Auto-detected: Chat starts with Assistant, enabling swap');
                             swapOrder = true;
                         }
                     }
