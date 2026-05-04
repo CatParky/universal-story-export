@@ -351,18 +351,59 @@
             </div>
             <h1>📖 Story Extractor</h1>
             <p>Extract user prompts and model responses from your JSON conversations</p>
-            <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.7;">Version 2.4 • Updated 18 February 2026</p>
+            <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.7;">Version 2.5 • Updated 4 May 2026</p>
             <p style="font-size: 0.8rem; margin-top: 0.3rem; opacity: 0.6;">
-                Supports: Claude Official (single & bulk), Nessie Labs, Claude Exporter
+                Supports: Claude Official (single & bulk), Nessie Labs, Claude Exporter, Markdown exports
             </p>
         </div>
 
         <div class="content">
+            <!-- Instructions Section -->
+            <div style="background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.5rem; margin: 1.5rem; margin-bottom: 2rem;">
+                <h3 style="color: #2d3748; margin-bottom: 1rem; font-size: 1.1rem;">📋 How to Export Your Claude Conversations</h3>
+                
+                <div style="margin-bottom: 1.5rem;">
+                    <h4 style="color: #4a5568; margin-bottom: 0.5rem; font-size: 1rem;">Method 1: GitHub Browser Script (Recommended)</h4>
+                    <p style="color: #718096; margin-bottom: 0.5rem; line-height: 1.6;">Export individual conversations as Markdown files:</p>
+                    <ol style="color: #4a5568; margin-left: 1.5rem; line-height: 1.8;">
+                        <li>Go to <a href="https://github.com/CatParky/claude-chat-exporter" target="_blank" style="color: #667eea; text-decoration: none; font-weight: 600;">github.com/CatParky/claude-chat-exporter</a></li>
+                        <li>Click on <code style="background: #e2e8f0; padding: 0.2rem 0.4rem; border-radius: 3px;">claude-chat-exporter.js</code></li>
+                        <li>Copy all the code (click "Copy raw file" button)</li>
+                        <li>Open your Claude conversation in claude.ai</li>
+                        <li>Press <strong>F12</strong> (or Cmd+Option+J on Mac) to open Developer Console</li>
+                        <li>Paste the script in the Console tab and press Enter</li>
+                        <li>Your conversation will download as a .md file!</li>
+                    </ol>
+                    <p style="color: #718096; margin-top: 0.5rem; font-size: 0.85rem; font-style: italic;">
+                        💡 This is a personal fork for reliability. Original script: <a href="https://github.com/agarwalvishal/claude-chat-exporter" target="_blank" style="color: #667eea; text-decoration: none;">agarwalvishal/claude-chat-exporter</a>
+                    </p>
+                </div>
+
+                <div style="margin-bottom: 1.5rem;">
+                    <h4 style="color: #4a5568; margin-bottom: 0.5rem; font-size: 1rem;">Method 2: Claude Official Export</h4>
+                    <p style="color: #718096; margin-bottom: 0.5rem; line-height: 1.6;">Export all your conversations at once:</p>
+                    <ol style="color: #4a5568; margin-left: 1.5rem; line-height: 1.8;">
+                        <li>Go to Settings → Privacy in Claude.ai</li>
+                        <li>Click "Export data"</li>
+                        <li>Wait for email with download link</li>
+                        <li>Download the ZIP file</li>
+                        <li>Extract and upload individual JSON files here</li>
+                    </ol>
+                </div>
+
+                <div>
+                    <h4 style="color: #4a5568; margin-bottom: 0.5rem; font-size: 1rem;">Method 3: Browser Extensions</h4>
+                    <p style="color: #718096; line-height: 1.6;">
+                        Install extensions like <a href="https://chromewebstore.google.com/detail/ai-chat-exporter-save-cla/elhmfakncmnghlnabnolalcjkdpfjnin" target="_blank" style="color: #667eea; text-decoration: none;">AI Chat Exporter</a> for one-click exports to PDF, Markdown, or JSON.
+                    </p>
+                </div>
+            </div>
+            
             <div class="upload-section" id="uploadSection">
                 <div class="upload-icon">📁</div>
-                <h2>Drop your JSON file here</h2>
+                <h2>Drop your JSON or Markdown file here</h2>
                 <p style="margin: 1rem 0; color: #718096;">or</p>
-                <input type="file" id="fileInput" accept=".json">
+                <input type="file" id="fileInput" accept=".json,.md">
                 <label for="fileInput" class="btn">Choose File</label>
             </div>
 
@@ -491,24 +532,112 @@
             const reader = new FileReader();
             reader.onload = (e) => {
                 try {
-                    const rawData = JSON.parse(e.target.result);
-                    conversationData = normalizeFormat(rawData);
+                    const content = e.target.result;
                     
-                    // If normalizeFormat returns null, it means we're showing conversation selector
-                    if (conversationData === null) {
-                        return; // Modal is now showing, wait for user selection
+                    // Check if it's a markdown file
+                    if (file.name.endsWith('.md')) {
+                        conversationData = parseMarkdown(content, file.name);
+                        displayResults();
+                        loading.classList.remove('active');
+                        statsSection.style.display = 'block';
+                    } else {
+                        // It's JSON
+                        const rawData = JSON.parse(content);
+                        conversationData = normalizeFormat(rawData);
+                        
+                        // If normalizeFormat returns null, it means we're showing conversation selector
+                        if (conversationData === null) {
+                            return; // Modal is now showing, wait for user selection
+                        }
+                        
+                        displayResults();
+                        loading.classList.remove('active');
+                        statsSection.style.display = 'block';
                     }
-                    
-                    displayResults();
-                    loading.classList.remove('active');
-                    statsSection.style.display = 'block';
                 } catch (error) {
-                    alert('Error parsing JSON file: ' + error.message);
+                    alert('Error parsing file: ' + error.message);
                     loading.classList.remove('active');
                     uploadSection.style.display = 'block';
                 }
             };
             reader.readAsText(file);
+        }
+        
+        function parseMarkdown(content, filename) {
+            // Parse GitHub script markdown format
+            const lines = content.split('\n');
+            const turns = [];
+            let currentTurn = null;
+            let currentRole = null;
+            let currentText = '';
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                
+                // Detect speaker headers: "## Human (timestamp):" or "## Claude:"
+                if (line.startsWith('## Human') || line.startsWith('## Claude')) {
+                    // Save previous message if exists
+                    if (currentTurn && currentText.trim()) {
+                        if (currentRole === 'user') {
+                            currentTurn.user_prompt = currentText.trim();
+                        } else if (currentRole === 'assistant') {
+                            currentTurn.model_responses = [currentText.trim()];
+                            turns.push(currentTurn);
+                            currentTurn = null;
+                        }
+                    }
+                    
+                    // Start new message
+                    if (line.startsWith('## Human')) {
+                        currentRole = 'user';
+                        currentTurn = {
+                            conversation_id: '',
+                            creation_timestamp: turns.length,
+                            user_id: '',
+                            user_prompt: '',
+                            model_responses: [],
+                            model_thoughts: [],
+                            update_timestamp: turns.length,
+                            attachments: []
+                        };
+                        currentText = '';
+                    } else {
+                        currentRole = 'assistant';
+                        currentText = '';
+                    }
+                } else if (line === '---') {
+                    // Separator - ignore
+                    continue;
+                } else if (currentRole) {
+                    // Accumulate message text
+                    if (currentText || line.trim()) { // Start accumulating after first non-empty line
+                        currentText += (currentText ? '\n' : '') + line;
+                    }
+                }
+            }
+            
+            // Save last message
+            if (currentTurn && currentText.trim()) {
+                if (currentRole === 'user') {
+                    currentTurn.user_prompt = currentText.trim();
+                } else if (currentRole === 'assistant') {
+                    currentTurn.model_responses = [currentText.trim()];
+                    turns.push(currentTurn);
+                }
+            }
+            
+            // Extract title from filename
+            const title = filename.replace('.md', '').replace(/_/g, ' ');
+            
+            return {
+                conversation: {
+                    title: title,
+                    creation_timestamp: 0,
+                    update_timestamp: 0,
+                    token_count: 'N/A'
+                },
+                turns: turns
+            };
         }
 
         function normalizeFormat(data) {
