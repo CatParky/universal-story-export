@@ -471,6 +471,7 @@
             <div class="modal-header">
                 <h2>Select a Conversation</h2>
                 <p style="color: #718096; font-size: 0.9rem;">This file contains multiple conversations. Choose one to extract:</p>
+                <input type="text" id="conversationFilter" value="RP" placeholder="Filter by name prefix (clear to show all)" oninput="renderConversationList()" style="margin-top: 0.75rem; padding: 0.5rem; border: 1px solid #cbd5e0; border-radius: 4px; width: 100%; font-family: inherit;">
             </div>
             <div class="conversation-list" id="conversationList"></div>
             <div class="modal-footer">
@@ -714,36 +715,51 @@
 
         function showConversationSelector(conversations) {
             bulkConversationsData = conversations;
-            const modal = document.getElementById('conversationModal');
+            renderConversationList();
+            document.getElementById('conversationModal').classList.add('active');
+            loading.classList.remove('active');
+        }
+
+        function renderConversationList() {
             const list = document.getElementById('conversationList');
-            
+            const filter = (document.getElementById('conversationFilter')?.value || '').trim().toUpperCase();
+
             list.innerHTML = '';
-            
-            conversations.forEach((conv, index) => {
+            selectedConversationIndex = null;
+
+            bulkConversationsData.forEach((conv, index) => {
+                const name = conv.name || conv.summary?.split('\n')[0] || 'Untitled Conversation';
+
+                // Filter by name prefix (case-insensitive); empty filter shows all
+                if (filter && !name.trim().toUpperCase().startsWith(filter)) {
+                    return;
+                }
+
                 const item = document.createElement('div');
                 item.className = 'conversation-item';
+                item.dataset.convIndex = index;
                 item.onclick = () => selectConversation(index);
-                
-                const name = conv.name || conv.summary?.split('\n')[0] || 'Untitled Conversation';
-                const created = new Date(conv.created_at).toLocaleDateString();
+
+                const created = new Date(conv.created_at).toLocaleDateString('en-GB');
                 const messageCount = conv.chat_messages?.length || 0;
-                
+
                 item.innerHTML = `
-                    <div class="conversation-name">${name}</div>
+                    <div class="conversation-name">${escapeHtml(name)}</div>
                     <div class="conversation-meta">${created} • ${messageCount} messages</div>
                 `;
-                
+
                 list.appendChild(item);
             });
-            
-            modal.classList.add('active');
-            loading.classList.remove('active');
+
+            if (!list.children.length) {
+                list.innerHTML = '<p style="padding: 1rem; color: #718096;">No conversations match this filter. Clear the box to show all.</p>';
+            }
         }
 
         function selectConversation(index) {
             selectedConversationIndex = index;
-            document.querySelectorAll('.conversation-item').forEach((item, i) => {
-                item.classList.toggle('selected', i === index);
+            document.querySelectorAll('.conversation-item').forEach((item) => {
+                item.classList.toggle('selected', Number(item.dataset.convIndex) === index);
             });
         }
 
@@ -776,13 +792,52 @@
             }
         }
 
+        // Retried or edited messages create branches in the export. Every
+        // message has a uuid and a parent_message_uuid; alternative retries
+        // share a parent, and the version that was KEPT is the one that
+        // later messages descend from. So: find the newest "leaf" (a message
+        // nothing else points to as parent) and walk back up the parent
+        // chain to the root. That path is the chat as shown on screen.
+        function resolveActiveThread(messages) {
+            if (!messages?.length || !messages[0].uuid) return messages || [];
+
+            const byUuid = {};
+            const isParent = new Set();
+            messages.forEach(m => {
+                byUuid[m.uuid] = m;
+                if (m.parent_message_uuid) isParent.add(m.parent_message_uuid);
+            });
+
+            const leaves = messages.filter(m => !isParent.has(m.uuid));
+            if (!leaves.length) return messages;
+
+            // The active branch ends at the most recently created leaf
+            let current = leaves.reduce((a, b) =>
+                (a.created_at || '') >= (b.created_at || '') ? a : b);
+
+            const chain = [];
+            while (current) {
+                chain.push(current);
+                current = byUuid[current.parent_message_uuid];
+            }
+            return chain.reverse();
+        }
+
+        // Remove placeholder blocks the export inserts where thinking or
+        // tool-use blocks sat in the original chat
+        function stripPlaceholders(text) {
+            return (text || '').replace(
+                /```\s*\r?\nThis block is not supported on your current device yet\.\s*\r?\n```\s*\r?\n?/g,
+                '').trim();
+        }
+
         function convertBulkConversation(conv) {
             // Convert Claude bulk format to standard format
             const turns = [];
             let currentTurn = null;
             
-            conv.chat_messages.forEach((msg, index) => {
-                const text = msg.text || msg.content?.[0]?.text || '';
+            resolveActiveThread(conv.chat_messages).forEach((msg, index) => {
+                const text = stripPlaceholders(msg.text || msg.content?.[0]?.text || '');
                 
                 if (msg.sender === 'human') {
                     // Start new turn
@@ -1083,14 +1138,17 @@
             const turns = conversationData.turns || [];
             let text = '';
 
+            const userChar = (document.getElementById('userCharacterName').value || 'User').toUpperCase();
+            const assistantChar = (document.getElementById('assistantCharacterName').value || 'Assistant').toUpperCase();
+
             turns.forEach((turn, index) => {
                 if (turn.user_prompt) {
-                    text += `RIV:\n${turn.user_prompt}\n\n`;
+                    text += `${userChar}:\n${turn.user_prompt}\n\n`;
                 }
 
                 if (turn.model_responses && turn.model_responses.length > 0) {
                     const lastResponse = turn.model_responses[turn.model_responses.length - 1];
-                    text += `GALE:\n${lastResponse}\n\n`;
+                    text += `${assistantChar}:\n${lastResponse}\n\n`;
                 }
                 
                 // Add asterism scene separator between turns (but not after the last one)
