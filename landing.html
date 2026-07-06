@@ -1,199 +1,317 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-GB">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Refuge - Story Tools</title>
+    <title>The Refuge — Story Tools</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        :root {
+            --paper: #efe9dd;
+            --raised: #f6f1e7;
+            --ink: #2b2622;
+            --soft: #5e564c;
+            --faint: #938878;
+            --rule: #d8cfbd;
+            --ox: #7c2d2d;
+            --oxs: #a24a42;
+            --gild: #b08d57;
         }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: Georgia, 'Times New Roman', serif;
+            background:
+                radial-gradient(ellipse at top, rgba(176,141,87,0.10), transparent 60%),
+                var(--paper);
+            color: var(--ink);
             min-height: 100vh;
-            padding: 2rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            padding: 3rem 1.25rem 5rem;
+            line-height: 1.6;
         }
 
-        .container {
-            max-width: 900px;
-            width: 100%;
-        }
+        .container { max-width: 68rem; margin: 0 auto; }
 
-        .hero {
-            text-align: center;
-            color: white;
-            margin-bottom: 3rem;
+        .hero { text-align: center; margin-bottom: 3.5rem; }
+
+        .hero .mark {
+            font-family: ui-monospace, monospace;
+            font-size: 0.7rem;
+            letter-spacing: 0.35em;
+            text-transform: uppercase;
+            color: var(--gild);
+            margin-bottom: 1rem;
         }
 
         .hero h1 {
-            font-size: 3.5rem;
-            margin-bottom: 0.5rem;
-            font-weight: 300;
-            letter-spacing: 0.05em;
+            font-size: 3.6rem;
+            font-weight: 500;
+            letter-spacing: 0.02em;
+            margin-bottom: 0.6rem;
         }
+        .hero h1 em { font-style: italic; color: var(--ox); }
 
         .hero .tagline {
-            font-size: 1.25rem;
-            opacity: 0.9;
-            font-weight: 300;
-            letter-spacing: 0.02em;
+            font-size: 1.2rem;
+            font-style: italic;
+            color: var(--soft);
+            max-width: 34rem;
+            margin: 0 auto;
+        }
+
+        .rule-orn {
+            width: 6rem; height: 1px;
+            background: var(--gild);
+            margin: 1.6rem auto 0;
+            position: relative;
+        }
+        .rule-orn::before {
+            content: "\2767";
+            position: absolute;
+            top: -0.85rem; left: 50%;
+            transform: translateX(-50%);
+            background: var(--paper);
+            padding: 0 0.6rem;
+            color: var(--gild);
+            font-size: 1rem;
+        }
+
+        .section-label {
+            font-family: ui-monospace, monospace;
+            font-size: 0.68rem;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--faint);
+            margin: 0 0 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.9rem;
+        }
+        .section-label::after {
+            content: "";
+            flex: 1; height: 1px;
+            background: var(--rule);
         }
 
         .tools-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
-            margin-bottom: 2rem;
+            grid-template-columns: repeat(auto-fit, minmax(15.5rem, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 3rem;
         }
 
         .tool-card {
-            background: white;
-            border-radius: 16px;
-            padding: 2rem;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            background: var(--raised);
+            border: 1px solid var(--rule);
+            border-radius: 14px;
+            padding: 1.8rem;
             text-decoration: none;
             color: inherit;
-            display: block;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 30px rgba(43,38,34,0.06);
+            transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+            position: relative;
         }
-
         .tool-card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 30px 80px rgba(0,0,0,0.4);
+            transform: translateY(-6px);
+            box-shadow: 0 22px 50px rgba(43,38,34,0.16);
+            border-color: var(--gild);
         }
 
-        .tool-icon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
+        .tool-step {
+            position: absolute;
+            top: 1.2rem; right: 1.4rem;
+            font-family: ui-monospace, monospace;
+            font-size: 0.66rem;
+            letter-spacing: 0.12em;
+            color: var(--gild);
+            text-transform: uppercase;
         }
+
+        .tool-icon { font-size: 2.4rem; margin-bottom: 0.9rem; }
 
         .tool-card h2 {
-            color: #2d3748;
-            margin-bottom: 0.75rem;
-            font-size: 1.5rem;
+            font-size: 1.4rem;
+            font-weight: 500;
+            margin-bottom: 0.55rem;
         }
+        .tool-card h2 em { font-style: italic; color: var(--ox); }
 
         .tool-card p {
-            color: #718096;
-            line-height: 1.6;
+            color: var(--soft);
+            font-size: 0.96rem;
             margin-bottom: 1rem;
         }
 
         .tool-features {
             list-style: none;
-            margin-top: 1rem;
+            margin-top: auto;
+            padding-top: 0.4rem;
         }
-
         .tool-features li {
-            color: #4a5568;
-            padding: 0.25rem 0;
-            font-size: 0.9rem;
+            color: var(--soft);
+            padding: 0.22rem 0 0.22rem 1.2rem;
+            font-size: 0.86rem;
+            position: relative;
+        }
+        .tool-features li::before {
+            content: "\2022";
+            position: absolute; left: 0.2rem;
+            color: var(--gild);
         }
 
-        .tool-features li:before {
-            content: "✓ ";
-            color: #667eea;
-            font-weight: bold;
-            margin-right: 0.5rem;
+        .cta {
+            margin-top: 1.3rem;
+            font-family: ui-monospace, monospace;
+            font-size: 0.72rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--ox);
         }
+        .tool-card:hover .cta { color: var(--oxs); }
+        .cta .arrow { transition: margin-left 0.2s ease; }
+        .tool-card:hover .cta .arrow { margin-left: 0.35rem; }
 
-        .cta-button {
-            display: inline-block;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 0.75rem 1.5rem;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: 500;
-            margin-top: 1rem;
-            transition: transform 0.2s;
-        }
+        .card-read { background: linear-gradient(160deg, #f3ead8 0%, var(--raised) 60%); }
+        .card-read .tool-step { color: var(--ox); }
 
-        .cta-button:hover {
-            transform: scale(1.05);
+        .flow {
+            background: var(--raised);
+            border: 1px solid var(--rule);
+            border-radius: 14px;
+            padding: 1.8rem 2rem;
+            margin-bottom: 3rem;
         }
+        .flow h3 { font-weight: 500; font-size: 1.15rem; margin-bottom: 1.2rem; }
+        .flow h3 em { font-style: italic; color: var(--ox); }
+        .flow-steps {
+            display: flex; flex-wrap: wrap;
+            gap: 0.6rem; align-items: center;
+            font-size: 0.92rem; color: var(--soft);
+        }
+        .flow-steps .step {
+            background: var(--paper);
+            border: 1px solid var(--rule);
+            border-radius: 999px;
+            padding: 0.4rem 0.95rem;
+        }
+        .flow-steps .step b { color: var(--ink); font-weight: 600; }
+        .flow-steps .sep { color: var(--gild); font-size: 1.1rem; }
 
         .footer {
             text-align: center;
-            color: white;
-            margin-top: 3rem;
-            opacity: 0.8;
+            color: var(--soft);
+            border-top: 1px solid var(--rule);
+            padding-top: 2rem;
+        }
+        .footer p { font-size: 0.9rem; margin-bottom: 0.4rem; }
+        .footer .privacy { font-style: italic; color: var(--ox); }
+        .footer .ver {
+            font-family: ui-monospace, monospace;
+            font-size: 0.72rem;
+            letter-spacing: 0.08em;
+            color: var(--faint);
+            margin-top: 0.9rem;
         }
 
-        .footer p {
-            font-size: 0.9rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .footer a {
-            color: white;
-            text-decoration: none;
-            border-bottom: 1px solid rgba(255,255,255,0.3);
-            transition: border-color 0.2s;
-        }
-
-        .footer a:hover {
-            border-bottom-color: white;
-        }
-
-        @media (max-width: 768px) {
-            .hero h1 {
-                font-size: 2.5rem;
-            }
-
-            .tools-grid {
-                grid-template-columns: 1fr;
-            }
+        @media (max-width: 620px) {
+            .hero h1 { font-size: 2.6rem; }
+            .flow-steps { font-size: 0.84rem; }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="hero">
-            <h1>The Refuge</h1>
-            <p class="tagline">Tools for preserving your stories</p>
+            <p class="mark">Catey Rivers &middot; Private Archive</p>
+            <h1>The <em>Refuge</em></h1>
+            <p class="tagline">A quiet set of tools for capturing, preparing, and keeping the stories worth returning to.</p>
+            <div class="rule-orn"></div>
         </div>
 
+        <p class="section-label">Capture &amp; format</p>
         <div class="tools-grid">
             <a href="https://catparky.github.io/universal-story-export/index.html" class="tool-card">
-                <div class="tool-icon">📖</div>
-                <h2>Story Extractor</h2>
-                <p>Extract and organize roleplay conversations from multiple platforms into beautifully formatted text files.</p>
+                <span class="tool-step">Step 01</span>
+                <div class="tool-icon">&#128214;</div>
+                <h2>Story <em>Extractor</em></h2>
+                <p>Pull a single roleplay out of a full Claude export and format it cleanly &mdash; right speaker names, retries resolved, briefing turns trimmed.</p>
                 <ul class="tool-features">
-                    <li>Supports Claude, Nessie Labs & Claude Exporter formats</li>
-                    <li>Custom character names</li>
-                    <li>Split large conversations (50 turns each)</li>
-                    <li>Bulk conversation selection</li>
-                    <li>Export to formatted text or JSON</li>
+                    <li>Claude, Nessie Labs, Claude Exporter &amp; Markdown formats</li>
+                    <li>Filter by name, choose one conversation</li>
+                    <li>Custom character names, start-from-turn</li>
+                    <li>Export to text, Markdown or JSON</li>
+                    <li>Reading Room frontmatter built in</li>
                 </ul>
-                <span class="cta-button">Open Story Extractor →</span>
+                <span class="cta">Open the extractor <span class="arrow">&rarr;</span></span>
             </a>
 
             <a href="https://catparky.github.io/universal-story-export/mhtml-converter.html" class="tool-card">
-                <div class="tool-icon">🔄</div>
-                <h2>MHTML Converter</h2>
-                <p>Convert saved chat pages (MHTML format) into JSON files compatible with Story Extractor.</p>
+                <span class="tool-step">Optional</span>
+                <div class="tool-icon">&#128260;</div>
+                <h2>MHTML <em>Converter</em></h2>
+                <p>Saved a chat as a web page instead? Turn an MHTML file into JSON the Extractor understands, without leaving the browser.</p>
                 <ul class="tool-features">
-                    <li>Drag & drop interface</li>
-                    <li>Client-side processing (privacy-preserving)</li>
-                    <li>Instant conversion</li>
+                    <li>Drag &amp; drop, instant conversion</li>
+                    <li>Entirely client-side</li>
                     <li>Works with any chat platform</li>
                     <li>No installation required</li>
                 </ul>
-                <span class="cta-button">Open MHTML Converter →</span>
+                <span class="cta">Open the converter <span class="arrow">&rarr;</span></span>
+            </a>
+
+            <a href="https://catparky.github.io/the-reading-room/tools/prepare.html" class="tool-card">
+                <span class="tool-step">Step 02</span>
+                <div class="tool-icon">&#128272;</div>
+                <h2>Prepare a <em>Story</em></h2>
+                <p>Paste the edited text, name it, and seal it with your passphrase. Frontmatter fills the form automatically; the file is encrypted before it ever touches the shelf.</p>
+                <ul class="tool-features">
+                    <li>Reads frontmatter from the Extractor</li>
+                    <li>AES-GCM encryption in your browser</li>
+                    <li>Passphrase never stored or sent</li>
+                    <li>Outputs a ready-to-commit file</li>
+                </ul>
+                <span class="cta">Open the prepare tool <span class="arrow">&rarr;</span></span>
             </a>
         </div>
 
+        <p class="section-label">The library</p>
+        <div class="tools-grid">
+            <a href="https://catparky.github.io/the-reading-room/" class="tool-card card-read">
+                <span class="tool-step">Step 03</span>
+                <div class="tool-icon">&#128367;</div>
+                <h2>The <em>Reading Room</em></h2>
+                <p>Your private, passphrase-locked shelf. Unlock once and every sealed story is decrypted in the browser &mdash; browse by character, scenario or tag, and settle in to read.</p>
+                <ul class="tool-features">
+                    <li>One passphrase unlocks the whole shelf</li>
+                    <li>Filter by tags, character &amp; scenario</li>
+                    <li>Everything decrypts locally, on your machine</li>
+                    <li>New stories appear automatically once pushed</li>
+                </ul>
+                <span class="cta">Enter the Reading Room <span class="arrow">&rarr;</span></span>
+            </a>
+        </div>
+
+        <div class="flow">
+            <h3>How it all <em>fits together</em></h3>
+            <div class="flow-steps">
+                <span class="step"><b>Extract</b> a chat</span>
+                <span class="sep">&rarr;</span>
+                <span class="step">edit &amp; add <b>frontmatter</b></span>
+                <span class="sep">&rarr;</span>
+                <span class="step"><b>Seal</b> with your passphrase</span>
+                <span class="sep">&rarr;</span>
+                <span class="step">commit &amp; <b>push</b></span>
+                <span class="sep">&rarr;</span>
+                <span class="step">read it in <b>the Refuge</b></span>
+            </div>
+        </div>
+
         <div class="footer">
-            <p>All tools process files locally in your browser. Your stories never leave your device.</p>
-            <p style="margin-top: 1rem; font-size: 0.85rem;">Version 2.4 • Updated 18 February 2026</p>
+            <p class="privacy">Every tool runs locally in your browser. Your stories never leave your device.</p>
+            <p>Sealed stories are encrypted before they are ever committed &mdash; the passphrase lives only in your head.</p>
+            <p class="ver">The Refuge &middot; v3.0 &middot; Updated July 2026</p>
         </div>
     </div>
 </body>
