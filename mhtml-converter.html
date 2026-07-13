@@ -586,63 +586,65 @@
                         return;
                     }
                     
-                    // Auto-detect message order based on first two turns
-                    let swapOrder = false;
-                    
-                    if (groupedBlocks.length >= 2) {
-                        if (groupedBlocks[0].speaker === 'assistant' && groupedBlocks[1].speaker === 'user') {
-                            console.log('Auto-detected: Chat starts with Assistant, enabling swap');
-                            swapOrder = true;
-                        }
-                    }
-                    
-                    console.log(`Using swap order: ${swapOrder}`);
-                    
+                    // Build turns by walking messages in DISPLAY ORDER.
+                    // The JSON schema is {user_prompt, model_responses} - a turn
+                    // always starts with the user. We do NOT swap or reverse:
+                    // the message sequence is already chronological.
+                    //
+                    // If the chat opens with the character (a greeting, as CrushOn
+                    // does), that greeting is emitted as its own turn with an empty
+                    // user_prompt, so it stays FIRST and everything after it lines
+                    // up correctly. Previously the "swap" logic paired the greeting
+                    // with the following user message, which shifted every reply out
+                    // of step and made conversations read backwards.
                     const turns = [];
-                    
-                    for (let i = 0; i < groupedBlocks.length; i++) {
-                        const current = groupedBlocks[i];
-                        const next = groupedBlocks[i + 1];
-                        
-                        if (!next) {
-                            console.log(`Reached end at block ${i}`);
-                            break;
-                        }
-                        
-                        let userMsg, assistantMsg;
-                        
-                        if (!swapOrder) {
-                            if (current.speaker === 'user' && next.speaker === 'assistant') {
-                                userMsg = current.text;
-                                assistantMsg = next.text;
-                                console.log(`Turn ${turns.length}: user→assistant`);
-                                i++;
-                            } else {
-                                console.log(`Skip ${i}: ${current.speaker}→${next.speaker} (expected user→assistant)`);
-                                continue;
-                            }
-                        } else {
-                            if (current.speaker === 'assistant' && next.speaker === 'user') {
-                                assistantMsg = current.text;
-                                userMsg = next.text;
-                                console.log(`Turn ${turns.length}: assistant→user`);
-                                i++;
-                            } else {
-                                console.log(`Skip ${i}: ${current.speaker}→${next.speaker} (expected assistant→user)`);
-                                continue;
-                            }
-                        }
-                        
+
+                    let i = 0;
+                    // Leading character greeting(s) with no preceding user message.
+                    while (i < groupedBlocks.length && groupedBlocks[i].speaker === 'assistant') {
                         turns.push({
                             conversation_id: '',
                             creation_timestamp: turns.length,
                             user_id: '',
-                            user_prompt: userMsg,
-                            model_responses: [assistantMsg],
+                            user_prompt: '',
+                            model_responses: [groupedBlocks[i].text],
                             model_thoughts: [],
                             update_timestamp: String(turns.length),
                             attachments: []
                         });
+                        console.log(`Turn ${turns.length - 1}: (opening character greeting)`);
+                        i++;
+                    }
+
+                    // Remaining messages: pair each user message with the assistant
+                    // reply that follows it. Consecutive same-speaker blocks are
+                    // already merged, so alternation holds - but we guard anyway.
+                    for (; i < groupedBlocks.length; i++) {
+                        const current = groupedBlocks[i];
+
+                        if (current.speaker === 'user') {
+                            const next = groupedBlocks[i + 1];
+                            const assistantMsg = (next && next.speaker === 'assistant') ? next.text : '';
+                            turns.push({
+                                conversation_id: '',
+                                creation_timestamp: turns.length,
+                                user_id: '',
+                                user_prompt: current.text,
+                                model_responses: assistantMsg ? [assistantMsg] : [],
+                                model_thoughts: [],
+                                update_timestamp: String(turns.length),
+                                attachments: []
+                            });
+                            console.log(`Turn ${turns.length - 1}: user${assistantMsg ? '\u2192assistant' : ' (no reply)'}`);
+                            if (assistantMsg) i++;
+                        } else {
+                            // An assistant block with no preceding user (mid-chat) -
+                            // attach it to the previous turn rather than dropping it.
+                            if (turns.length > 0) {
+                                turns[turns.length - 1].model_responses.push(current.text);
+                                console.log(`Turn ${turns.length - 1}: +extra assistant block`);
+                            }
+                        }
                     }
                     
                     console.log(`Created ${turns.length} turns`);
