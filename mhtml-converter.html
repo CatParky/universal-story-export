@@ -180,7 +180,7 @@
             </div>
             <h1>💜 Chat MHTML to JSON Converter</h1>
             <p>Convert saved chat exports for use with Story Extractor</p>
-            <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.8;">Version 2.1 • 1 April 2026</p>
+            <p style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.8;">Version 2.2 • 13 July 2026</p>
         </div>
 
         <div class="content">
@@ -272,11 +272,23 @@
         });
 
         function decodeQuotedPrintable(text) {
-            text = text.replace(/=\r?\n\s*/g, '');
-            text = text.replace(/=([0-9A-F]{2})/gi, (match, hex) => {
-                return String.fromCharCode(parseInt(hex, 16));
-            });
-            return text;
+            // Remove soft line breaks ONLY (=\r\n). Do NOT strip following
+            // whitespace - the leading space on the next line is real content
+            // (previously caused words to run together, e.g. "werea").
+            text = text.replace(/=\r?\n/g, '');
+            // Decode =XX sequences to BYTES, then decode the byte stream as
+            // UTF-8. Decoding each byte with String.fromCharCode produced
+            // mojibake for multi-byte characters (apostrophes, dashes, etc).
+            const bytes = [];
+            for (let i = 0; i < text.length; i++) {
+                if (text[i] === '=' && /^[0-9A-Fa-f]{2}$/.test(text.substr(i + 1, 2))) {
+                    bytes.push(parseInt(text.substr(i + 1, 2), 16));
+                    i += 2;
+                } else {
+                    bytes.push(text.charCodeAt(i) & 0xFF);
+                }
+            }
+            return new TextDecoder('utf-8').decode(new Uint8Array(bytes));
         }
 
         function decodeHTML(text) {
@@ -391,161 +403,155 @@
                     content = decodeQuotedPrintable(content);
                     console.log('Decoded content length:', content.length);
                     
-                    // Find all speaker positions
-                    const speakerPattern = /<span>([^<]+)<\/span>/g;
-                    const speakerPositions = [];
-                    let match;
-                    
-                    while ((match = speakerPattern.exec(content)) !== null) {
-                        const speaker = match[1].trim();
-                        
-                        // Skip navigation/policy links and UI elements
-                        if (speaker.includes('Term') || speaker.includes('Policy') || 
-                            speaker.includes('Guidelines') || speaker.includes('Program') ||
-                            speaker.includes('Chat') || speaker.includes('Upgrade') ||
-                            speaker.includes('Current') || speaker.includes('Continue') ||
-                            speaker.includes('Plan') || speaker.includes('Setting') ||
-                            speaker.includes('Detail') || speaker.includes('Edit') ||
-                            speaker.includes('Memory') || speaker.includes('Memories') ||
-                            speaker.includes('Summarize') || speaker.includes('Pinned') ||
-                            speaker.includes('Unfiltered') || speaker.includes('Rec.') ||
-                            speaker.includes('Scene') || speaker.includes('Instruction') ||
-                            speaker.includes('Voice') || speaker.includes('Group') ||
-                            speaker.includes('Medium') || speaker.includes('High') ||
-                            speaker.includes('Save') || speaker.includes('View')) {
-                            continue;
-                        }
-                        
-                        // Skip very long text (likely not a speaker name)
-                        if (speaker.length > 80) {
-                            continue;
-                        }
-                        
-                        // Skip very short (1-2 chars) or numbers/model names
-                        if (speaker.length <= 2 || /^\d+\/\d+$/.test(speaker) || 
-                            speaker.includes('8K') || speaker.includes('Flash') || 
-                            speaker.includes('Gemini') || speaker.includes('Ultra') ||
-                            speaker.includes('DS R') || speaker.includes('Tau') ||
-                            speaker.includes('loaded')) {
-                            continue;
-                        }
-                        
-                        // ACCEPT if it looks like a character name:
-                        // - Contains character markers (emoji, brackets, quotes)
-                        // - OR is a reasonable name length (3-40 chars, starts with capital letter)
-                        const hasMarkers = speaker.includes('💜') || speaker.includes('[') || 
-                                          speaker.includes("'") || speaker.includes('"');
-                        const isReasonableName = speaker.length >= 3 && speaker.length <= 40 && 
-                                                /^[A-Z]/.test(speaker);
-                        
-                        if (hasMarkers || isReasonableName) {
-                            speakerPositions.push({
-                                speaker: speaker,
-                                start: match.index + match[0].length,
-                                matchStart: match.index
-                            });
-                        }
-                    }
-                    
-                    console.log(`Found ${speakerPositions.length} speaker positions`);
-                    
-                    if (speakerPositions.length === 0) {
-                        // DEBUG: Let's see what we're filtering out
-                        console.log('DEBUG: No speakers found after filtering. Checking all <span> tags...');
-                        const allSpans = [...content.matchAll(speakerPattern)];
-                        console.log(`Total <span> tags found: ${allSpans.length}`);
-                        console.log('First 20 <span> contents:');
-                        allSpans.slice(0, 20).forEach((match, i) => {
-                            const text = match[1].trim();
-                            console.log(`  ${i}: "${text.substring(0, 80)}" (len: ${text.length})`);
-                        });
-                        
-                        alert('Error: No speaker positions found. The MHTML format may not be supported.\n\nCheck the console (F12) to see what <span> tags were found.');
-                        return;
-                    }
-                    
-                    // NEW APPROACH: Extract ALL messages and assign speakers based on proximity
+                    // ============================================================
+                    // NEW ROW-BASED EXTRACTION (CrushOn 2026 layout)
+                    // Each message lives in <div data-id="<uuid>" ...>.
+                    // Assistant rows: right padding (pr-11) + character name span.
+                    // User rows: right-aligned (justify-end / items-end / pl-11),
+                    // NO name span - only an avatar <img alt="...">.
+                    // ============================================================
                     const messageBlocks = [];
-                    
-                    // Find ALL message paragraphs with their positions
-                    const allMessagePattern = /<p class="mb-1 break-words"[^>]*>(.*?)<\/p>/gs;
-                    const allMessages = [...content.matchAll(allMessagePattern)];
-                    
-                    console.log(`Found ${allMessages.length} total message paragraphs`);
-                    
-                    if (allMessages.length === 0) {
-                        alert('Error: No message paragraphs found in the file.');
-                        return;
-                    }
-                    
-                    // For each message, find the closest preceding speaker tag
-                    for (let msgMatch of allMessages) {
-                        const msgPos = msgMatch.index;
-                        
-                        // Find the most recent speaker tag BEFORE this message
-                        let closestSpeaker = null;
-                        let closestDistance = Infinity;
-                        
-                        for (let sp of speakerPositions) {
-                            if (sp.matchStart < msgPos) {
-                                const distance = msgPos - sp.matchStart;
-                                // Only consider tags within 5000 chars (same speaker block)
-                                if (distance < closestDistance && distance < 5000) {
-                                    closestDistance = distance;
-                                    closestSpeaker = sp.speaker;
-                                }
-                            }
-                        }
-                        
-                        // Clean the message text
-                        let text = msgMatch[1];
-                        text = text.replace(/<[^>]+>/g, '');
+                    const uuidRe = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/;
+                    const rowSplit = content.split(/(?=<div data-id=")/);
+                    const msgRows = rowSplit.filter(r => {
+                        const m = r.match(/^<div data-id="([^"]+)"/);
+                        return m && uuidRe.test(m[1]);
+                    });
+                    console.log(`Found ${msgRows.length} data-id message rows`);
+
+                    function cleanMessageText(rawHtml) {
+                        let text = rawHtml.replace(/<[^>]+>/g, '');
                         text = decodeHTML(text);
                         text = fixWin1252Artifacts(text);
                         text = text.replace(/[\u0080-\u009F]/g, '');
-                        text = text.replace(/â€"/g, '—');
-                        text = text.replace(/â€™/g, "'");
-                        text = text.replace(/â€œ/g, '"');
-                        text = text.replace(/â€/g, '"');
-                        text = text.replace(/â€¦/g, '…');
-                        text = text.replace(/Â/g, '');
-                        text = text.replace(/â/g, '—');
-                        text = text.replace(/([.!?,;:"])([A-Z])/g, '$1 $2');
-                        text = text.replace(/([a-z])([A-Z])/g, '$1 $2');
                         text = text.replace(/\s+/g, ' ');
-                        text = text.trim();
-                        
-                        if (text.length === 0) continue;
-                        
-                        // Determine if this is assistant or user
-                        let isAssistant = false;
-                        
-                        if (closestSpeaker) {
-                            // Has a speaker tag - check if it matches assistant
-                            const speakerLower = closestSpeaker.toLowerCase();
-                            const assistantLower = assistantName.toLowerCase();
-                            
-                            if (speakerLower.includes(assistantLower) || assistantLower.includes(speakerLower)) {
-                                isAssistant = true;
-                            }
-                            // If doesn't match assistant, it's user (old format with user tags)
-                        } else {
-                            // No speaker tag - assume USER (new CrushOn format)
-                            isAssistant = false;
-                        }
-                        
-                        const displayName = isAssistant ? assistantDisplayName : userDisplayName;
-                        
-                        messageBlocks.push({
-                            speaker: isAssistant ? 'assistant' : 'user',
-                            displayName: displayName,
-                            text: text,
-                            originalSpeaker: closestSpeaker || '(no tag)',
-                            position: msgPos
-                        });
+                        return text.trim();
                     }
-                    
-                    console.log(`Extracted ${messageBlocks.length} individual message paragraphs`);
+
+                    const paraRe = /<p class="mb-1 break-words"[^>]*>([\s\S]*?)<\/p>/g;
+
+                    if (msgRows.length > 0) {
+                        const assistantSpanRe = new RegExp('<span>\\s*' +
+                            assistantName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') +
+                            '\\s*</span>', 'i');
+
+                        for (const row of msgRows) {
+                            const paras = [...row.matchAll(paraRe)].map(m => cleanMessageText(m[1])).filter(t => t.length > 0);
+                            if (paras.length === 0) continue;
+
+                            // Inspect only the row header (before the message body)
+                            // so we don't false-match on message content.
+                            const head = row.substring(0, 1500);
+                            let isAssistant;
+                            if (assistantSpanRe.test(head) || head.includes('pr-11')) {
+                                isAssistant = true;
+                            } else if (head.includes('justify-end') || head.includes('items-end') || head.includes('pl-11')) {
+                                isAssistant = false;
+                            } else {
+                                isAssistant = false; // unnamed rows are user messages
+                            }
+
+                            messageBlocks.push({
+                                speaker: isAssistant ? 'assistant' : 'user',
+                                displayName: isAssistant ? assistantDisplayName : userDisplayName,
+                                text: paras.join('\n\n'),
+                                originalSpeaker: isAssistant ? assistantName : '(user row)'
+                            });
+                        }
+                        console.log(`Row-based extraction produced ${messageBlocks.length} messages`);
+                    }
+
+                    // ============================================================
+                    // LEGACY FALLBACK (pre-2026 layout with speaker <span> tags)
+                    // ============================================================
+                    if (messageBlocks.length === 0) {
+                        console.log('Row-based extraction found nothing - falling back to legacy speaker-tag method');
+                        const speakerPattern = /<span>([^<]+)<\/span>/g;
+                        const speakerPositions = [];
+                        let match;
+
+                        while ((match = speakerPattern.exec(content)) !== null) {
+                            const speaker = match[1].trim();
+
+                            if (speaker.includes('Term') || speaker.includes('Policy') ||
+                                speaker.includes('Guidelines') || speaker.includes('Program') ||
+                                speaker.includes('Chat') || speaker.includes('Upgrade') ||
+                                speaker.includes('Current') || speaker.includes('Continue') ||
+                                speaker.includes('Plan') || speaker.includes('Setting') ||
+                                speaker.includes('Detail') || speaker.includes('Edit') ||
+                                speaker.includes('Memory') || speaker.includes('Memories') ||
+                                speaker.includes('Summarize') || speaker.includes('Pinned') ||
+                                speaker.includes('Unfiltered') || speaker.includes('Rec.') ||
+                                speaker.includes('Scene') || speaker.includes('Instruction') ||
+                                speaker.includes('Voice') || speaker.includes('Group') ||
+                                speaker.includes('Medium') || speaker.includes('High') ||
+                                speaker.includes('Save') || speaker.includes('View')) {
+                                continue;
+                            }
+                            if (speaker.length > 80) continue;
+                            if (speaker.length <= 2 || /^\d+\/\d+$/.test(speaker) ||
+                                speaker.includes('8K') || speaker.includes('Flash') ||
+                                speaker.includes('Gemini') || speaker.includes('Ultra') ||
+                                speaker.includes('DS R') || speaker.includes('Tau') ||
+                                speaker.includes('loaded')) {
+                                continue;
+                            }
+
+                            const hasMarkers = speaker.includes('\u{1F49C}') || speaker.includes('[') ||
+                                              speaker.includes("'") || speaker.includes('"');
+                            const isReasonableName = speaker.length >= 3 && speaker.length <= 40 &&
+                                                    /^[A-Z]/.test(speaker);
+
+                            if (hasMarkers || isReasonableName) {
+                                speakerPositions.push({
+                                    speaker: speaker,
+                                    matchStart: match.index
+                                });
+                            }
+                        }
+
+                        const allMessages = [...content.matchAll(paraRe)];
+                        for (const msgMatch of allMessages) {
+                            const msgPos = msgMatch.index;
+                            let closestSpeaker = null;
+                            let closestDistance = Infinity;
+                            for (const sp of speakerPositions) {
+                                if (sp.matchStart < msgPos) {
+                                    const distance = msgPos - sp.matchStart;
+                                    if (distance < closestDistance && distance < 5000) {
+                                        closestDistance = distance;
+                                        closestSpeaker = sp.speaker;
+                                    }
+                                }
+                            }
+
+                            const text = cleanMessageText(msgMatch[1]);
+                            if (text.length === 0) continue;
+
+                            let isAssistant = false;
+                            if (closestSpeaker) {
+                                const speakerLower = closestSpeaker.toLowerCase();
+                                const assistantLower = assistantName.toLowerCase();
+                                if (speakerLower.includes(assistantLower) || assistantLower.includes(speakerLower)) {
+                                    isAssistant = true;
+                                }
+                            }
+
+                            messageBlocks.push({
+                                speaker: isAssistant ? 'assistant' : 'user',
+                                displayName: isAssistant ? assistantDisplayName : userDisplayName,
+                                text: text,
+                                originalSpeaker: closestSpeaker || '(no tag)'
+                            });
+                        }
+                    }
+
+                    if (messageBlocks.length === 0) {
+                        alert('Error: No messages found. The MHTML format may not be supported.\n\nCheck the console (F12) for details.');
+                        return;
+                    }
+
+                    console.log(`Extracted ${messageBlocks.length} individual messages`);
                     
                     // GROUP consecutive messages from the same speaker into turns
                     const groupedBlocks = [];
