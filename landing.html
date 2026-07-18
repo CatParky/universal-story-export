@@ -1,318 +1,121 @@
 <!DOCTYPE html>
 <html lang="en-GB">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Refuge — Story Tools</title>
-    <style>
-        :root {
-            --paper: #efe9dd;
-            --raised: #f6f1e7;
-            --ink: #2b2622;
-            --soft: #5e564c;
-            --faint: #938878;
-            --rule: #d8cfbd;
-            --ox: #7c2d2d;
-            --oxs: #a24a42;
-            --gild: #b08d57;
-        }
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>The Refuge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Spectral:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#efe9dd; --raised:#f6f1e7;
+    --ink:#2b2622; --soft:#5e564c; --faint:#938878;
+    --rule:#d8cfbd; --ox:#7c2d2d; --oxs:#a24a42;
+    --sage:#5f6f5a; --shadow:rgba(43,38,34,.10);
+    --fd:"Fraunces",Georgia,serif; --fb:"Spectral",Georgia,serif;
+    --fm:"IBM Plex Mono",ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--paper);color:var(--ink);font-family:var(--fb);
+    font-size:17px;line-height:1.65;min-height:100vh}
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+  .nav{display:flex;align-items:center;gap:1.2rem;flex-wrap:wrap;
+    padding:1rem 1.4rem;border-bottom:1px solid var(--rule);background:var(--raised)}
+  .nav .wordmark{font-family:var(--fd);font-weight:500;font-size:1.25rem;
+    color:var(--ink);text-decoration:none}
+  .nav .wordmark em{font-style:italic;color:var(--ox);font-weight:400}
+  .nav a.link{font-family:var(--fm);font-size:.7rem;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--soft);text-decoration:none;padding:.3rem 0}
+  .nav a.link:hover{color:var(--ox)}
+  .nav a.link.active{color:var(--ox);border-bottom:2px solid var(--ox)}
+  .nav .spacer{flex:1}
 
-        body {
-            font-family: Georgia, 'Times New Roman', serif;
-            background:
-                radial-gradient(ellipse at top, rgba(176,141,87,0.10), transparent 60%),
-                var(--paper);
-            color: var(--ink);
-            min-height: 100vh;
-            padding: 3rem 1.25rem 5rem;
-            line-height: 1.6;
-        }
+  .wrap{max-width:46rem;margin:0 auto;padding:3rem 1.2rem 5rem}
+  h1{font-family:var(--fd);font-weight:500;font-size:2.4rem;letter-spacing:-.01em}
+  h1 em{font-style:italic;color:var(--ox);font-weight:400}
+  .sub{font-style:italic;color:var(--soft);margin:.5rem 0 2.6rem;font-size:1.02rem}
 
-        .container { max-width: 68rem; margin: 0 auto; }
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem}
+  @media(max-width:620px){.cards{grid-template-columns:1fr}}
+  .card{display:block;background:var(--raised);border:1px solid var(--rule);
+    border-radius:.9rem;padding:1.6rem 1.5rem;text-decoration:none;color:var(--ink);
+    box-shadow:0 2px 10px var(--shadow);transition:transform .15s, box-shadow .15s}
+  .card:hover{transform:translateY(-3px);box-shadow:0 8px 24px var(--shadow)}
+  .card .kicker{font-family:var(--fm);font-size:.64rem;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--faint);margin-bottom:.5rem}
+  .card h2{font-family:var(--fd);font-weight:500;font-size:1.45rem;margin-bottom:.5rem}
+  .card h2 em{font-style:italic;color:var(--ox);font-weight:400}
+  .card p{color:var(--soft);font-size:.94rem}
+  .card .go{display:inline-block;margin-top:1rem;font-family:var(--fm);font-size:.68rem;
+    letter-spacing:.12em;text-transform:uppercase;color:var(--ox)}
 
-        .hero { text-align: center; margin-bottom: 3.5rem; }
+  .flow{margin-top:2.8rem;background:var(--raised);border:1px solid var(--rule);
+    border-radius:.8rem;padding:1.2rem 1.4rem}
+  .flow b{font-family:var(--fm);font-size:.64rem;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--faint);display:block;margin-bottom:.7rem}
+  .pills{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+  .pill{font-family:var(--fm);font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;
+    background:var(--paper);border:1px solid var(--rule);border-radius:1rem;
+    padding:.35rem .85rem;color:var(--soft)}
+  .arrow{color:var(--faint)}
+  .flow p{margin-top:.8rem;color:var(--soft);font-size:.9rem;font-style:italic}
 
-        .hero .mark {
-            font-family: ui-monospace, monospace;
-            font-size: 0.7rem;
-            letter-spacing: 0.35em;
-            text-transform: uppercase;
-            color: var(--gild);
-            margin-bottom: 1rem;
-        }
-
-        .hero h1 {
-            font-size: 3.6rem;
-            font-weight: 500;
-            letter-spacing: 0.02em;
-            margin-bottom: 0.6rem;
-        }
-        .hero h1 em { font-style: italic; color: var(--ox); }
-
-        .hero .tagline {
-            font-size: 1.2rem;
-            font-style: italic;
-            color: var(--soft);
-            max-width: 34rem;
-            margin: 0 auto;
-        }
-
-        .rule-orn {
-            width: 6rem; height: 1px;
-            background: var(--gild);
-            margin: 1.6rem auto 0;
-            position: relative;
-        }
-        .rule-orn::before {
-            content: "\2767";
-            position: absolute;
-            top: -0.85rem; left: 50%;
-            transform: translateX(-50%);
-            background: var(--paper);
-            padding: 0 0.6rem;
-            color: var(--gild);
-            font-size: 1rem;
-        }
-
-        .section-label {
-            font-family: ui-monospace, monospace;
-            font-size: 0.68rem;
-            letter-spacing: 0.18em;
-            text-transform: uppercase;
-            color: var(--faint);
-            margin: 0 0 1.25rem;
-            display: flex;
-            align-items: center;
-            gap: 0.9rem;
-        }
-        .section-label::after {
-            content: "";
-            flex: 1; height: 1px;
-            background: var(--rule);
-        }
-
-        .tools-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(15.5rem, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 3rem;
-        }
-
-        .tool-card {
-            background: var(--raised);
-            border: 1px solid var(--rule);
-            border-radius: 14px;
-            padding: 1.8rem;
-            text-decoration: none;
-            color: inherit;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 10px 30px rgba(43,38,34,0.06);
-            transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
-            position: relative;
-        }
-        .tool-card:hover {
-            transform: translateY(-6px);
-            box-shadow: 0 22px 50px rgba(43,38,34,0.16);
-            border-color: var(--gild);
-        }
-
-        .tool-step {
-            position: absolute;
-            top: 1.2rem; right: 1.4rem;
-            font-family: ui-monospace, monospace;
-            font-size: 0.66rem;
-            letter-spacing: 0.12em;
-            color: var(--gild);
-            text-transform: uppercase;
-        }
-
-        .tool-icon { font-size: 2.4rem; margin-bottom: 0.9rem; }
-
-        .tool-card h2 {
-            font-size: 1.4rem;
-            font-weight: 500;
-            margin-bottom: 0.55rem;
-        }
-        .tool-card h2 em { font-style: italic; color: var(--ox); }
-
-        .tool-card p {
-            color: var(--soft);
-            font-size: 0.96rem;
-            margin-bottom: 1rem;
-        }
-
-        .tool-features {
-            list-style: none;
-            margin-top: auto;
-            padding-top: 0.4rem;
-        }
-        .tool-features li {
-            color: var(--soft);
-            padding: 0.22rem 0 0.22rem 1.2rem;
-            font-size: 0.86rem;
-            position: relative;
-        }
-        .tool-features li::before {
-            content: "\2022";
-            position: absolute; left: 0.2rem;
-            color: var(--gild);
-        }
-
-        .cta {
-            margin-top: 1.3rem;
-            font-family: ui-monospace, monospace;
-            font-size: 0.72rem;
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-            color: var(--ox);
-        }
-        .tool-card:hover .cta { color: var(--oxs); }
-        .cta .arrow { transition: margin-left 0.2s ease; }
-        .tool-card:hover .cta .arrow { margin-left: 0.35rem; }
-
-        .card-read { background: linear-gradient(160deg, #f3ead8 0%, var(--raised) 60%); }
-        .card-read .tool-step { color: var(--ox); }
-
-        .flow {
-            background: var(--raised);
-            border: 1px solid var(--rule);
-            border-radius: 14px;
-            padding: 1.8rem 2rem;
-            margin-bottom: 3rem;
-        }
-        .flow h3 { font-weight: 500; font-size: 1.15rem; margin-bottom: 1.2rem; }
-        .flow h3 em { font-style: italic; color: var(--ox); }
-        .flow-steps {
-            display: flex; flex-wrap: wrap;
-            gap: 0.6rem; align-items: center;
-            font-size: 0.92rem; color: var(--soft);
-        }
-        .flow-steps .step {
-            background: var(--paper);
-            border: 1px solid var(--rule);
-            border-radius: 999px;
-            padding: 0.4rem 0.95rem;
-        }
-        .flow-steps .step b { color: var(--ink); font-weight: 600; }
-        .flow-steps .sep { color: var(--gild); font-size: 1.1rem; }
-
-        .footer {
-            text-align: center;
-            color: var(--soft);
-            border-top: 1px solid var(--rule);
-            padding-top: 2rem;
-        }
-        .footer p { font-size: 0.9rem; margin-bottom: 0.4rem; }
-        .footer .privacy { font-style: italic; color: var(--ox); }
-        .footer .ver {
-            font-family: ui-monospace, monospace;
-            font-size: 0.72rem;
-            letter-spacing: 0.08em;
-            color: var(--faint);
-            margin-top: 0.9rem;
-        }
-
-        @media (max-width: 620px) {
-            .hero h1 { font-size: 2.6rem; }
-            .flow-steps { font-size: 0.84rem; }
-        }
-    </style>
+  .legacy{margin-top:2.4rem;font-size:.82rem;color:var(--faint);font-style:italic}
+  .legacy a{color:var(--faint)}
+</style>
 </head>
 <body>
-    <div class="container">
-        <div class="hero">
-            <p class="mark">Catey Rivers &middot; Private Archive</p>
-            <h1>The <em>Refuge</em></h1>
-            <p class="tagline">A quiet set of tools for capturing, preparing, and keeping the stories worth returning to.</p>
-            <div class="rule-orn"></div>
-        </div>
 
-        <p class="section-label">Capture &amp; format</p>
-        <div class="tools-grid">
-            <a href="https://catparky.github.io/universal-story-export/index.html" class="tool-card">
-                <span class="tool-step">Step 01</span>
-                <div class="tool-icon">&#128214;</div>
-                <h2>Story <em>Extractor</em></h2>
-                <p>Pull a single roleplay out of a full Claude export and format it cleanly &mdash; right speaker names, retries resolved, briefing turns trimmed.</p>
-                <ul class="tool-features">
-                    <li>Claude, Nessie Labs, Claude Exporter &amp; Markdown formats</li>
-                    <li>Filter by name, choose one conversation</li>
-                    <li>Custom character names, start-from-turn</li>
-                    <li>Export to text, Markdown or JSON</li>
-                    <li>Reading Room frontmatter built in</li>
-                </ul>
-                <span class="cta">Open the extractor <span class="arrow">&rarr;</span></span>
-            </a>
+<nav class="nav">
+  <a class="wordmark" href="landing.html">The <em>Refuge</em></a>
+  <span class="spacer"></span>
+  <a class="link active" href="landing.html">Home</a>
+  <a class="link" href="pipeline.html">Pipeline</a>
+  <a class="link" href="https://catparky.github.io/the-reading-room/">Library</a>
+</nav>
 
-            <a href="https://catparky.github.io/universal-story-export/mhtml-converter.html" class="tool-card">
-                <span class="tool-step">Optional</span>
-                <div class="tool-icon">&#128260;</div>
-                <h2>MHTML <em>Converter</em></h2>
-                <p>Saved a chat as a web page instead? Turn an MHTML file into JSON the Extractor understands, without leaving the browser.</p>
-                <ul class="tool-features">
-                    <li>Drag &amp; drop, instant conversion</li>
-                    <li>Entirely client-side</li>
-                    <li>Works with any chat platform</li>
-                    <li>No installation required</li>
-                </ul>
-                <span class="cta">Open the converter <span class="arrow">&rarr;</span></span>
-            </a>
+<div class="wrap">
+  <h1>The <em>Refuge</em></h1>
+  <p class="sub">A quiet corner for keeping chats worth keeping.</p>
 
-            <a href="https://catparky.github.io/the-reading-room/tools/prepare.html" class="tool-card">
-                <span class="tool-step">Step 02</span>
-                <div class="tool-icon">&#128272;</div>
-                <h2>Prepare a <em>Story</em></h2>
-                <p>Paste the edited text, name it, and seal it with your passphrase. Frontmatter fills the form automatically; the file is encrypted before it ever touches the shelf.</p>
-                <ul class="tool-features">
-                    <li>Reads frontmatter from the Extractor</li>
-                    <li>AES-GCM encryption in your browser</li>
-                    <li>Passphrase never stored or sent</li>
-                    <li>Outputs a ready-to-commit file</li>
-                </ul>
-                <span class="cta">Open the prepare tool <span class="arrow">&rarr;</span></span>
-            </a>
-        </div>
+  <div class="cards">
+    <a class="card" href="pipeline.html">
+      <div class="kicker">Steps 1 – 3</div>
+      <h2>The <em>Pipeline</em></h2>
+      <p>Bring a chat in from any source, check and tidy it, then seal it for
+      the shelf. One journey, one page — the format is recognised automatically.</p>
+      <span class="go">Open the pipeline ›</span>
+    </a>
+    <a class="card" href="https://catparky.github.io/the-reading-room/">
+      <div class="kicker">The shelf</div>
+      <h2>The Reading <em>Room</em></h2>
+      <p>The library itself. Browse the shelf, filter by character, scenario or
+      tag, and settle in to read. Members only — the librarian will ask for
+      your word.</p>
+      <span class="go">Enter the library ›</span>
+    </a>
+  </div>
 
-        <p class="section-label">The library</p>
-        <div class="tools-grid">
-            <a href="https://catparky.github.io/the-reading-room/" class="tool-card card-read">
-                <span class="tool-step">Step 03</span>
-                <div class="tool-icon">&#128367;</div>
-                <h2>The <em>Reading Room</em></h2>
-                <p>Your private, passphrase-locked shelf. Unlock once and every sealed story is decrypted in the browser &mdash; browse by character, scenario or tag, and settle in to read.</p>
-                <ul class="tool-features">
-                    <li>One passphrase unlocks the whole shelf</li>
-                    <li>Filter by tags, character &amp; scenario</li>
-                    <li>Everything decrypts locally, on your machine</li>
-                    <li>New stories appear automatically once pushed</li>
-                </ul>
-                <span class="cta">Enter the Reading Room <span class="arrow">&rarr;</span></span>
-            </a>
-        </div>
-
-        <div class="flow">
-            <h3>How it all <em>fits together</em></h3>
-            <div class="flow-steps">
-                <span class="step"><b>Extract</b> a chat</span>
-                <span class="sep">&rarr;</span>
-                <span class="step">edit &amp; add <b>frontmatter</b></span>
-                <span class="sep">&rarr;</span>
-                <span class="step"><b>Seal</b> with your passphrase</span>
-                <span class="sep">&rarr;</span>
-                <span class="step">commit &amp; <b>push</b></span>
-                <span class="sep">&rarr;</span>
-                <span class="step">read it in <b>the Refuge</b></span>
-            </div>
-        </div>
-
-        <div class="footer">
-            <p class="privacy">Every tool runs locally in your browser. Your stories never leave your device.</p>
-            <p>Sealed stories are encrypted before they are ever committed &mdash; the passphrase lives only in your head.</p>
-            <p class="ver">The Refuge &middot; v3.0 &middot; Updated July 2026</p>
-        </div>
+  <div class="flow">
+    <b>How it fits together</b>
+    <div class="pills">
+      <span class="pill">Extract</span><span class="arrow">→</span>
+      <span class="pill">Check</span><span class="arrow">→</span>
+      <span class="pill">Archive</span><span class="arrow">→</span>
+      <span class="pill">Read</span>
     </div>
+    <p>Everything runs in your browser, on your machine. Nothing is sent
+    anywhere, and the library keeps its contents sealed.</p>
+  </div>
+
+  <p class="legacy">Earlier tools are still available:
+    <a href="index.html">extractor</a> ·
+    <a href="mhtml-converter.html">converter</a> ·
+    <a href="https://catparky.github.io/the-reading-room/tools/prepare.html">prepare</a>
+  </p>
+</div>
+
 </body>
 </html>

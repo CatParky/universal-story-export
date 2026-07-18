@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Pipeline — The Refuge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Spectral:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root{
+    --paper:#efe9dd; --raised:#f6f1e7;
+    --ink:#2b2622; --soft:#5e564c; --faint:#938878;
+    --rule:#d8cfbd; --ox:#7c2d2d; --oxs:#a24a42;
+    --sage:#5f6f5a; --shadow:rgba(43,38,34,.10);
+    --fd:"Fraunces",Georgia,serif; --fb:"Spectral",Georgia,serif;
+    --fm:"IBM Plex Mono",ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--paper);color:var(--ink);font-family:var(--fb);
+    font-size:17px;line-height:1.6;min-height:100vh;padding-bottom:5rem}
+
+  /* ---------- shared nav ---------- */
+  .nav{display:flex;align-items:center;gap:1.2rem;flex-wrap:wrap;
+    padding:1rem 1.4rem;border-bottom:1px solid var(--rule);background:var(--raised)}
+  .nav .wordmark{font-family:var(--fd);font-weight:500;font-size:1.25rem;
+    color:var(--ink);text-decoration:none}
+  .nav .wordmark em{font-style:italic;color:var(--ox);font-weight:400}
+  .nav a.link{font-family:var(--fm);font-size:.7rem;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--soft);text-decoration:none;padding:.3rem 0}
+  .nav a.link:hover{color:var(--ox)}
+  .nav a.link.active{color:var(--ox);border-bottom:2px solid var(--ox)}
+  .nav .spacer{flex:1}
+
+  /* ---------- step indicator ---------- */
+  .steps{display:flex;justify-content:center;gap:0;margin:1.8rem auto 0;max-width:36rem;padding:0 1rem}
+  .step{flex:1;text-align:center;position:relative;font-family:var(--fm);
+    font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+  .step .dot{width:2rem;height:2rem;border-radius:50%;margin:0 auto .4rem;
+    display:flex;align-items:center;justify-content:center;
+    border:2px solid var(--rule);background:var(--raised);font-size:.85rem;
+    font-family:var(--fd);color:var(--faint)}
+  .step.done .dot{border-color:var(--sage);color:var(--sage)}
+  .step.now .dot{border-color:var(--ox);background:var(--ox);color:var(--raised)}
+  .step.now{color:var(--ox)}
+  .step.done{color:var(--sage)}
+  .step:not(:first-child)::before{content:"";position:absolute;top:1rem;right:50%;
+    width:100%;height:2px;background:var(--rule);z-index:-1}
+  .step.clickable{cursor:pointer}
+
+  .wrap{max-width:52rem;margin:0 auto;padding:1.6rem 1.2rem}
+  h1{font-family:var(--fd);font-weight:500;font-size:1.7rem;margin-bottom:.3rem}
+  h1 em{font-style:italic;color:var(--ox)}
+  .sub{font-style:italic;color:var(--soft);margin-bottom:1.8rem;font-size:.95rem}
+
+  /* ---------- drop zone ---------- */
+  .drop{border:2px dashed var(--rule);border-radius:.8rem;background:var(--raised);
+    padding:3rem 1.5rem;text-align:center;cursor:pointer;transition:all .2s}
+  .drop:hover,.drop.over{border-color:var(--ox);background:#fbf7ee}
+  .drop .big{font-family:var(--fd);font-size:1.25rem;margin-bottom:.5rem}
+  .drop .hint{color:var(--faint);font-size:.88rem;font-style:italic}
+  .srcs{display:flex;justify-content:center;gap:.5rem;flex-wrap:wrap;margin-top:1.2rem}
+  .src{font-family:var(--fm);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--soft);background:var(--paper);border:1px solid var(--rule);
+    border-radius:1rem;padding:.3rem .8rem}
+  .status{margin-top:1rem;font-style:italic;color:var(--soft);min-height:1.4em}
+  .status.err{color:var(--ox)}
+
+  /* ---------- modal (chat list) ---------- */
+  .modal{position:fixed;inset:0;background:rgba(43,38,34,.45);display:none;
+    align-items:center;justify-content:center;z-index:50;padding:1rem}
+  .modal.on{display:flex}
+  .modal-card{background:var(--paper);border-radius:.8rem;max-width:34rem;width:100%;
+    max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px var(--shadow)}
+  .modal-head{padding:1.2rem 1.4rem .8rem;border-bottom:1px solid var(--rule)}
+  .modal-head h2{font-family:var(--fd);font-weight:500;font-size:1.2rem}
+  .modal-head input{width:100%;margin-top:.7rem;background:var(--raised);
+    border:1px solid var(--rule);border-radius:.4rem;padding:.5rem .8rem;
+    font-family:var(--fb);font-size:.95rem;color:var(--ink)}
+  .modal-list{overflow-y:auto;flex:1;padding:.6rem}
+  .chat-item{padding:.7rem .9rem;border-radius:.5rem;cursor:pointer;border:1px solid transparent}
+  .chat-item:hover{background:var(--raised)}
+  .chat-item.sel{background:var(--raised);border-color:var(--ox)}
+  .chat-name{font-size:.98rem}
+  .chat-meta{font-family:var(--fm);font-size:.66rem;color:var(--faint);margin-top:.15rem}
+  .modal-foot{padding:.9rem 1.4rem;border-top:1px solid var(--rule);
+    display:flex;gap:.8rem;justify-content:flex-end}
+
+  /* ---------- buttons ---------- */
+  .btn{background:var(--ox);color:var(--raised);border:none;border-radius:.45rem;
+    padding:.65rem 1.3rem;cursor:pointer;font-family:var(--fm);font-size:.7rem;
+    letter-spacing:.12em;text-transform:uppercase}
+  .btn:hover{background:var(--oxs)}
+  .btn.ghost{background:transparent;color:var(--soft);border:1px solid var(--rule)}
+  .btn.ghost:hover{color:var(--ox);border-color:var(--ox);background:transparent}
+  .btn.small{padding:.4rem .8rem;font-size:.62rem}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+
+  /* ---------- check step ---------- */
+  .panel{background:var(--raised);border:1px solid var(--rule);border-radius:.7rem;
+    padding:1.1rem 1.3rem;margin-bottom:1.2rem}
+  label{display:block;font-family:var(--fm);font-size:.64rem;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--faint);margin:0 0 .3rem}
+  input[type=text],input[type=password],input[type=date],input[type=number],textarea,select{
+    width:100%;background:var(--paper);border:1px solid var(--rule);border-radius:.4rem;
+    padding:.55rem .75rem;color:var(--ink);font-family:var(--fb);font-size:.98rem}
+  input:focus-visible,textarea:focus-visible{outline:2px solid var(--ox);outline-offset:1px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:.9rem}
+  .grid3{display:grid;grid-template-columns:1fr 1fr auto;gap:.9rem;align-items:end}
+  @media(max-width:600px){.grid2,.grid3{grid-template-columns:1fr}}
+  .counts{display:flex;gap:1.4rem;flex-wrap:wrap;font-family:var(--fm);
+    font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);
+    align-items:center}
+  .counts b{color:var(--ox);font-weight:500}
+  .sticky{position:sticky;top:0;z-index:10;background:var(--paper);
+    padding:.7rem 0;border-bottom:1px solid var(--rule);margin-bottom:1rem;
+    display:flex;gap:.8rem;align-items:center;flex-wrap:wrap}
+
+  .turn{background:var(--raised);border:1px solid var(--rule);border-radius:.7rem;
+    margin-bottom:1rem;overflow:hidden}
+  .turn.excluded{opacity:.42}
+  .turn-head{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;
+    padding:.55rem .9rem;border-bottom:1px solid var(--rule);background:var(--paper)}
+  .turn-num{font-family:var(--fm);font-size:.68rem;color:var(--faint);letter-spacing:.08em}
+  .turn-head .spacer{flex:1}
+  .msg{padding:.8rem 1rem}
+  .msg + .msg{border-top:1px dashed var(--rule)}
+  .who{font-family:var(--fm);font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;
+    margin-bottom:.35rem;display:flex;align-items:center;gap:.6rem}
+  .who.u{color:var(--sage)} .who.c{color:var(--ox)}
+  .who .edit-link{cursor:pointer;color:var(--faint);font-size:.62rem;text-decoration:underline}
+  .msg .body{white-space:pre-wrap;font-size:.97rem}
+  .msg textarea{min-height:7rem;line-height:1.55;resize:vertical;font-size:.95rem}
+  .variants{padding:.5rem 1rem .8rem;border-top:1px dashed var(--rule);background:var(--paper)}
+  .variants .vlabel{font-family:var(--fm);font-size:.62rem;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--faint);margin-bottom:.4rem}
+  .variant{display:flex;gap:.5rem;align-items:flex-start;padding:.3rem 0;font-size:.88rem}
+  .variant input{width:auto;margin-top:.3rem}
+  .variant .vtext{color:var(--soft);max-height:4.6em;overflow:hidden}
+  .variant.chosen .vtext{color:var(--ink)}
+  .marker{font-family:var(--fm);font-size:.62rem;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--raised);background:var(--sage);
+    border-radius:1rem;padding:.15rem .6rem}
+  .marker.end{background:var(--ox)}
+  .footer-note{color:var(--faint);font-size:.85rem;font-style:italic;margin-top:.6rem}
+
+  /* ---------- archive step ---------- */
+  .after{background:var(--raised);border:1px solid var(--rule);border-radius:.6rem;
+    padding:1rem 1.2rem;font-size:.9rem;line-height:1.7;color:var(--soft);margin-top:1.4rem}
+  .after b{font-family:var(--fm);font-size:.66rem;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--faint);display:block;margin-bottom:.4rem}
+  .msgline{margin-top:.9rem;font-style:italic;min-height:1.4em}
+  .msgline.ok{color:var(--sage)} .msgline.err{color:var(--ox)}
+  .exports{display:flex;gap:.7rem;flex-wrap:wrap;margin-top:.9rem}
+  .stage{display:none} .stage.on{display:block}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a class="wordmark" href="landing.html">The <em>Refuge</em></a>
+  <span class="spacer"></span>
+  <a class="link" href="landing.html">Home</a>
+  <a class="link active" href="pipeline.html">Pipeline</a>
+  <a class="link" href="https://catparky.github.io/the-reading-room/">Library</a>
+</nav>
+
+<div class="steps">
+  <div class="step now" id="stepDot1"><div class="dot">1</div>Extract</div>
+  <div class="step" id="stepDot2"><div class="dot">2</div>Check</div>
+  <div class="step" id="stepDot3"><div class="dot">3</div>Archive</div>
+</div>
+
+<!-- ============ STAGE 1 : EXTRACT ============ -->
+<div class="wrap stage on" id="stage1">
+  <h1>Bring a <em>chat</em> in</h1>
+  <p class="sub">Drop a file below — the pipeline recognises the source automatically.
+  Everything runs on your machine; nothing is uploaded anywhere.</p>
+
+  <div class="drop" id="drop">
+    <div class="big">Drop a file here, or click to choose</div>
+    <div class="hint">The format is detected from the file itself</div>
+    <div class="srcs">
+      <span class="src">MHTML page save</span>
+      <span class="src">Claude export (.zip)</span>
+      <span class="src">conversations.json</span>
+      <span class="src">JSON</span>
+      <span class="src">Markdown</span>
+      <span class="src">Text</span>
+    </div>
+  </div>
+  <input type="file" id="fileInput" hidden accept=".mhtml,.mht,.zip,.json,.md,.txt">
+  <p class="status" id="status1"></p>
+</div>
+
+<!-- chat picker modal (Claude exports) -->
+<div class="modal" id="chatModal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2>Choose a chat</h2>
+      <input type="text" id="chatFilter" placeholder="Filter by title prefix…">
+    </div>
+    <div class="modal-list" id="chatList"></div>
+    <div class="modal-foot">
+      <button class="btn ghost" id="chatCancel">Cancel</button>
+      <button class="btn" id="chatLoad">Open chat</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ STAGE 2 : CHECK ============ -->
+<div class="wrap stage" id="stage2">
+  <h1>Check the <em>chat</em></h1>
+  <p class="sub">Confirm the names, tidy the text, choose where the story starts and ends.
+  Spelling is checked as you edit (click any passage to edit it).</p>
+
+  <div class="panel">
+    <div class="grid2" style="margin-bottom:.9rem">
+      <div><label for="storyTitle">Title</label><input type="text" id="storyTitle"></div>
+      <div><label for="jumpTo">Jump to turn</label><input type="number" id="jumpTo" min="1" placeholder="e.g. 12"></div>
+    </div>
+    <div class="grid3">
+      <div><label for="userName">Your name</label><input type="text" id="userName" placeholder="Me"></div>
+      <div><label for="charName">Character name</label><input type="text" id="charName" placeholder="Character"></div>
+      <div><button class="btn ghost" id="swapNames" title="Swap the two names">⇄ Swap</button></div>
+    </div>
+  </div>
+
+  <div class="sticky">
+    <div class="counts">
+      <span>Turns <b id="cTotal">0</b></span>
+      <span>Included <b id="cIncl">0</b></span>
+      <span>Words <b id="cWords">0</b></span>
+    </div>
+    <span style="flex:1"></span>
+    <button class="btn ghost small" id="backToPick" hidden>Choose another chat</button>
+    <button class="btn ghost small" id="restart">Start over</button>
+    <button class="btn" id="toArchive">Continue → Archive</button>
+  </div>
+
+  <div id="turnList"></div>
+  <p class="footer-note">“Start here” excludes everything before a turn; “End here” excludes
+  everything after it. Individual turns can also be left out.</p>
+</div>
+
+<!-- ============ STAGE 3 : ARCHIVE ============ -->
+<div class="wrap stage" id="stage3">
+  <h1>Add to the <em>library</em></h1>
+  <p class="sub">Fill in the shelf details, seal with your passphrase, and download the
+  library file — or export a plain copy for your own records.</p>
+
+  <div class="panel">
+    <div class="grid2">
+      <div><label for="fmTitle">Title</label><input type="text" id="fmTitle"></div>
+      <div><label for="fmDate">Date</label><input type="date" id="fmDate"></div>
+    </div>
+    <div class="grid2" style="margin-top:.9rem">
+      <div><label for="fmCharacter">Character</label><input type="text" id="fmCharacter"></div>
+      <div><label for="fmScenario">Scenario</label><input type="text" id="fmScenario"></div>
+    </div>
+    <div class="grid2" style="margin-top:.9rem">
+      <div><label for="fmTags">Tags (comma separated — these drive the filters)</label><input type="text" id="fmTags"></div>
+      <div><label for="fmStatus">Status</label><input type="text" id="fmStatus" value="complete"></div>
+    </div>
+    <div style="margin-top:.9rem"><label for="fmSummary">Summary (one line, shown on the shelf)</label><input type="text" id="fmSummary"></div>
+    <div style="margin-top:.9rem"><label for="pass">Passphrase</label>
+      <input type="password" id="pass" autocomplete="new-password">
+      <p class="footer-note" style="margin-top:.3rem">Must be the same passphrase every time. It is never stored and never recoverable.</p>
+    </div>
+
+    <div class="exports" style="margin-top:1.3rem">
+      <button class="btn" id="sealBtn">Seal &amp; download</button>
+      <button class="btn ghost" id="expMd">Markdown copy</button>
+      <button class="btn ghost" id="expTxt">Text copy</button>
+      <button class="btn ghost" id="expJson">JSON copy</button>
+      <button class="btn ghost" id="copyClip">Copy to clipboard</button>
+    </div>
+    <p class="msgline" id="msg3"></p>
+  </div>
+
+  <div class="sticky" style="border-bottom:none;border-top:1px solid var(--rule);padding-top:.9rem">
+    <button class="btn ghost small" id="backToCheck">‹ Back to Check</button>
+  </div>
+
+  <div class="after">
+    <b>After downloading the sealed file</b>
+    1. Go to the library repository on GitHub and open the <code>stories/</code> folder.<br>
+    2. Choose <em>Add file → Upload files</em>, drop the <code>story-XXXXXX.json</code> file in, and commit.<br>
+    3. The shelf index rebuilds itself automatically — the story appears within a minute.
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   STATE
+   ===================================================================== */
+let state = null;          // { title, created, turns:[{user_prompt, model_responses[], chosen, included}] }
+let bulkChats = null;      // Claude export chat array (kept so more chats can be opened)
+let selectedChat = null;
+const $ = s => document.querySelector(s);
+
+function freshState(title, created, turns){
+  state = {
+    title: title || 'Untitled',
+    created: created || Math.floor(Date.now()/1000),
+    turns: turns.map(t => ({
+      user_prompt: t.user_prompt || '',
+      model_responses: (t.model_responses || []).slice(),
+      chosen: Math.max(0, (t.model_responses || []).length - 1),
+      included: true
+    }))
+  };
+}
+
+/* =====================================================================
+   STAGE HANDLING
+   ===================================================================== */
+function goStage(n){
+  [1,2,3].forEach(i=>{
+    $('#stage'+i).classList.toggle('on', i===n);
+    const dot = $('#stepDot'+i);
+    dot.classList.toggle('now', i===n);
+    dot.classList.toggle('done', i<n);
+    dot.classList.toggle('clickable', i<n);
+  });
+  window.scrollTo({top:0});
+}
+$('#stepDot1').onclick = ()=>{ if($('#stepDot1').classList.contains('done')) goStage(1); };
+$('#stepDot2').onclick = ()=>{ if($('#stepDot2').classList.contains('done')) goStage(2); };
+
+/* =====================================================================
+   STAGE 1 — DETECTION & PARSERS
+   ===================================================================== */
+const drop = $('#drop'), fileInput = $('#fileInput'), status1 = $('#status1');
+drop.onclick = ()=>fileInput.click();
+drop.ondragover = e=>{e.preventDefault();drop.classList.add('over');};
+drop.ondragleave = ()=>drop.classList.remove('over');
+drop.ondrop = e=>{e.preventDefault();drop.classList.remove('over');
+  if(e.dataTransfer.files.length) route(e.dataTransfer.files[0]);};
+fileInput.onchange = e=>{ if(e.target.files.length) route(e.target.files[0]); };
+
+function say(t, err){ status1.textContent=t; status1.className='status'+(err?' err':''); }
+
+async function route(file){
+  say('Reading ' + file.name + '…');
+  const name = file.name.toLowerCase();
+  try{
+    if(name.endsWith('.mhtml') || name.endsWith('.mht')){
+      const buf = await file.arrayBuffer();
+      const parsed = parseMHTML(new TextDecoder('utf-8').decode(new Uint8Array(buf)));
+      startCheck(parsed.title, null, parsed.turns, false,
+        parsed.detectedCharName ? {user:'', char:parsed.detectedCharName} : null);
+    } else if(name.endsWith('.zip')){
+      await routeZip(file);
+    } else if(name.endsWith('.json')){
+      routeJSON(JSON.parse(await file.text()), file.name);
+    } else if(name.endsWith('.md') || name.endsWith('.txt')){
+      routeText(await file.text(), file.name);
+    } else {
+      // sniff: zip magic bytes?
+      const head = new Uint8Array(await file.slice(0,4).arrayBuffer());
+      if(head[0]===0x50 && head[1]===0x4B){ await routeZip(file); return; }
+      say("I don't recognise this file type. Supported: .mhtml, .zip, .json, .md, .txt", true);
+    }
+  }catch(err){
+    console.error(err);
+    say('Could not read that file: ' + err.message, true);
+  }
+}
+
+async function routeZip(file){
+  say('Opening archive…');
+  const zip = await JSZip.loadAsync(file);
+  let entry = null;
+  zip.forEach((path, f)=>{ if(!entry && /(^|\/)conversations\.json$/i.test(path)) entry = f; });
+  if(!entry) throw new Error('No conversations.json found inside this archive.');
+  const data = JSON.parse(await entry.async('string'));
+  routeJSON(data, 'conversations.json');
+}
+
+function routeJSON(data, filename){
+  // Claude export: array of chats with chat_messages
+  if(Array.isArray(data) && data.length && data[0].chat_messages){
+    bulkChats = data;
+    openChatPicker();
+    say('');
+    return;
+  }
+  // Own pipeline / converter format: {conversation, turns}
+  if(data.turns && Array.isArray(data.turns)){
+    const conv = data.conversation || data.metadata || {};
+    startCheck(conv.title, conv.creation_timestamp, data.turns, false);
+    return;
+  }
+  // Previously extracted format: {metadata, turns:[{turn_number, user_prompt, model_response}]}
+  if(data.metadata && Array.isArray(data.turns) && data.turns.length && 'model_response' in data.turns[0]){
+    const turns = data.turns.map(t=>({user_prompt:t.user_prompt||'', model_responses:t.model_response?[t.model_response]:[]}));
+    startCheck(data.metadata.title, data.metadata.creation_timestamp, turns, false);
+    return;
+  }
+  // Exporter format: {metadata, messages:[{role, say}]}
+  if(data.messages && Array.isArray(data.messages)){
+    const turns = [];
+    let cur = null;
+    data.messages.forEach(m=>{
+      if(m.role==='Prompt'){ cur = {user_prompt:m.say||'', model_responses:[]}; }
+      else if(m.role==='Response' && cur){ cur.model_responses.push(m.say||''); turns.push(cur); cur=null; }
+    });
+    if(cur) turns.push(cur);
+    startCheck(data.metadata && data.metadata.title, null, turns, false);
+    return;
+  }
+  throw new Error('Unrecognised JSON structure.');
+}
+
+function routeText(content, filename){
+  const title = filename.replace(/\.(md|txt)$/i,'').replace(/_/g,' ');
+  // Format A: "## Human" / "## Claude" headers
+  if(/^## (Human|Claude)/m.test(content)){
+    startCheck(title, null, parseHeaderMarkdown(content), false);
+    return;
+  }
+  // Format B: "NAME:" line-led blocks
+  const parsed = parseNameLed(content);
+  if(parsed){ startCheck(title, null, parsed.turns, false, parsed.names); return; }
+  // Fallback: single body block
+  startCheck(title, null, [{user_prompt:'', model_responses:[content.trim()]}], false);
+}
+
+function parseHeaderMarkdown(content){
+  const lines = content.split('\n');
+  const turns = []; let cur=null, role=null, text='';
+  const flush = ()=>{
+    if(!text.trim()) return;
+    if(role==='user'){ cur = {user_prompt:text.trim(), model_responses:[]}; }
+    else if(role==='assistant'){
+      if(!cur) cur = {user_prompt:'', model_responses:[]};
+      cur.model_responses.push(text.trim()); turns.push(cur); cur=null;
+    }
+    text='';
+  };
+  for(const line of lines){
+    if(line.startsWith('## Human')){ flush(); role='user'; }
+    else if(line.startsWith('## Claude')){ flush(); role='assistant'; }
+    else if(line==='---'){ continue; }
+    else if(role){ if(text || line.trim()) text += (text?'\n':'') + line; }
+  }
+  flush();
+  if(cur) turns.push(cur);
+  return turns;
+}
+
+function parseNameLed(content){
+  // Blocks led by "NAME:" on its own line (the pipeline's own text export)
+  const re = /^([A-Za-z][\w .''-]{0,39}):\s*$/;
+  const lines = content.split('\n');
+  const blocks = []; let curName=null, buf=[];
+  const push = ()=>{ if(curName && buf.join('\n').trim())
+    blocks.push({name:curName, text:buf.join('\n').trim()}); buf=[]; };
+  for(const line of lines){
+    const m = line.match(re);
+    if(m){ push(); curName = m[1].trim(); }
+    else if(line.trim()==='* * *'){ continue; }
+    else if(curName){ buf.push(line); }
+  }
+  push();
+  if(blocks.length < 2) return null;
+  const names = [...new Set(blocks.map(b=>b.name))];
+  if(names.length < 1 || names.length > 2) return null;
+  const userN = names[0], charN = names[1] || '';
+  const turns = []; let cur=null;
+  for(const b of blocks){
+    if(b.name===userN){ if(cur) turns.push(cur); cur = {user_prompt:b.text, model_responses:[]}; }
+    else { if(!cur) cur = {user_prompt:'', model_responses:[]};
+      cur.model_responses.push(b.text); turns.push(cur); cur=null; }
+  }
+  if(cur) turns.push(cur);
+  return { turns, names:{user:userN, char:charN} };
+}
+
+/* ---------- Claude export helpers ---------- */
+
+// Retried or edited messages create branches. Every message has a uuid and a
+// parent_message_uuid; the kept version is the one later messages descend
+// from. Find the newest leaf and walk back to the root — that path is the
+// chat as shown on screen.
+function resolveActiveThread(messages){
+  if(!messages || !messages.length || !messages[0].uuid) return messages || [];
+  const byUuid = {}; const isParent = new Set();
+  messages.forEach(m=>{ byUuid[m.uuid]=m;
+    if(m.parent_message_uuid) isParent.add(m.parent_message_uuid); });
+  const leaves = messages.filter(m=>!isParent.has(m.uuid));
+  if(!leaves.length) return messages;
+  let cur = leaves.reduce((a,b)=>(a.created_at||'')>=(b.created_at||'')?a:b);
+  const chain=[];
+  while(cur){ chain.push(cur); cur = byUuid[cur.parent_message_uuid]; }
+  return chain.reverse();
+}
+
+// Remove placeholder blocks the export inserts where thinking or tool-use sat
+function stripPlaceholders(text){
+  return (text||'').replace(
+    /```\s*\r?\nThis block is not supported on your current device yet\.\s*\r?\n```\s*\r?\n?/g,
+    '').trim();
+}
+
+function convertClaudeChat(conv){
+  const turns=[]; let cur=null;
+  resolveActiveThread(conv.chat_messages).forEach(msg=>{
+    const text = stripPlaceholders(msg.text || (msg.content && msg.content[0] && msg.content[0].text) || '');
+    if(msg.sender==='human'){
+      if(cur) turns.push(cur);
+      cur = {user_prompt:text, model_responses:[]};
+    } else if(msg.sender==='assistant'){
+      if(!cur) cur = {user_prompt:'', model_responses:[]};
+      cur.model_responses.push(text); turns.push(cur); cur=null;
+    }
+  });
+  if(cur) turns.push(cur);
+  return turns;
+}
+
+/* ---------- chat picker ---------- */
+const chatModal = $('#chatModal'), chatList = $('#chatList'), chatFilter = $('#chatFilter');
+chatFilter.value = localStorage.getItem('refuge.chatFilter') || '';
+chatFilter.oninput = ()=>{ localStorage.setItem('refuge.chatFilter', chatFilter.value); renderChatList(); };
+$('#chatCancel').onclick = ()=>{ chatModal.classList.remove('on'); };
+$('#chatLoad').onclick = ()=>{
+  if(selectedChat===null){ alert('Choose a chat first.'); return; }
+  const conv = bulkChats[selectedChat];
+  chatModal.classList.remove('on');
+  startCheck(conv.name, conv.created_at ? new Date(conv.created_at).getTime()/1000 : null,
+    convertClaudeChat(conv), true);
+};
+
+function openChatPicker(){ selectedChat=null; renderChatList(); chatModal.classList.add('on'); }
+
+function renderChatList(){
+  const filter = chatFilter.value.trim().toUpperCase();
+  chatList.innerHTML='';
+  selectedChat = null;
+  bulkChats.forEach((conv,i)=>{
+    const name = conv.name || 'Untitled';
+    if(filter && !name.trim().toUpperCase().startsWith(filter)) return;
+    const div = document.createElement('div');
+    div.className='chat-item'; div.dataset.i=i;
+    const created = conv.created_at ? new Date(conv.created_at).toLocaleDateString('en-GB') : '';
+    const count = (conv.chat_messages||[]).length;
+    div.innerHTML = `<div class="chat-name">${esc(name)}</div>
+      <div class="chat-meta">${created} · ${count} messages</div>`;
+    div.onclick = ()=>{
+      selectedChat=i;
+      chatList.querySelectorAll('.chat-item').forEach(el=>
+        el.classList.toggle('sel', Number(el.dataset.i)===i));
+    };
+    chatList.appendChild(div);
+  });
+  if(!chatList.children.length)
+    chatList.innerHTML = '<p style="padding:1rem;color:var(--faint);font-style:italic">Nothing matches this filter — clear the box to show every chat.</p>';
+}
+
+/* ---------- MHTML parsing (row-based, with legacy fallback) ---------- */
+
+function decodeQuotedPrintable(text){
+  // Remove soft line breaks ONLY (=\r\n). Do NOT strip following whitespace —
+  // the leading space on the next line is real content.
+  text = text.replace(/=\r?\n/g,'');
+  // Decode =XX sequences to BYTES, then decode the stream as UTF-8. Decoding
+  // each byte with String.fromCharCode produces mojibake for multi-byte chars.
+  const bytes=[];
+  for(let i=0;i<text.length;i++){
+    if(text[i]==='=' && /^[0-9A-Fa-f]{2}$/.test(text.substr(i+1,2))){
+      bytes.push(parseInt(text.substr(i+1,2),16)); i+=2;
+    } else bytes.push(text.charCodeAt(i)&0xFF);
+  }
+  return new TextDecoder('utf-8').decode(new Uint8Array(bytes));
+}
+function decodeHTML(t){ const ta=document.createElement('textarea'); ta.innerHTML=t; return ta.value; }
+function fixWin1252Artifacts(text){
+  return text
+    .replace(/\u2014\u0080\u009c/g,'\u201c').replace(/\u2014\u0080\u009d/g,'\u201d')
+    .replace(/\u2014\u0080\u0099/g,'\u2019').replace(/\u2014\u0080\u0098/g,'\u2018')
+    .replace(/\u2014\u0080\u0085/g,'\u2026').replace(/\u2014\u0080\u00a6/g,'\u2026')
+    .replace(/\u0084/g,'\u201e').replace(/\u0091/g,'\u2018').replace(/\u0092/g,'\u2019')
+    .replace(/\u0093/g,'\u201c').replace(/\u0094/g,'\u201d').replace(/\u0085/g,'\u2026');
+}
+function cleanTitle(title){
+  return title.replace(/[^\x20-\x7E]/g,'').replace(/\s*\[.*?\]\s*/g,'')
+    .trim().replace(/\s+/g,' ');
+}
+
+function parseMHTML(content){
+  // Title from the Subject header
+  let title='Conversation';
+  const sm = content.match(/Subject:\s*(.+?)(?:\r?\n(?!\s))/s);
+  if(sm){
+    let raw = sm[1].replace(/=\?[^?]+\?[QB]\?([^?]+)\?=/gi,
+      (m,enc)=>decodeQuotedPrintable(enc.replace(/=\r?\n\s*/g,'')));
+    raw = raw.replace(/\r?\n\s*/g,'');
+    title = cleanTitle(raw.replace(/\s*\|\s*\d+\s*memories.*$/i,'')
+      .replace(/\s*\|\s*\d+\s*interactions.*$/i,'').trim());
+  }
+
+  const htmlStart = content.indexOf('<!DOCTYPE html>');
+  if(htmlStart===-1) throw new Error('No HTML content found inside the MHTML file.');
+  content = decodeQuotedPrintable(content.substring(htmlStart));
+
+  const messageBlocks=[];
+  const uuidRe = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/;
+  const rowSplit = content.split(/(?=<div data-id=")/);
+  const msgRows = rowSplit.filter(r=>{
+    const m = r.match(/^<div data-id="([^"]+)"/);
+    return m && uuidRe.test(m[1]);
+  });
+
+  function cleanMessageText(rawHtml){
+    let t = rawHtml.replace(/<[^>]+>/g,'');
+    t = decodeHTML(t); t = fixWin1252Artifacts(t);
+    t = t.replace(/[\u0080-\u009F]/g,'').replace(/\s+/g,' ');
+    return t.trim();
+  }
+  const paraRe = /<p class="mb-1 break-words"[^>]*>([\s\S]*?)<\/p>/g;
+
+  // Row-based extraction (current layout): assistant rows have right padding
+  // (pr-11) or a name span; user rows are right-aligned (justify-end /
+  // items-end / pl-11) with no name span. Speaker is decided from the row
+  // header only — no name required from the user.
+  let detectedCharName = '';
+  if(msgRows.length){
+    for(const row of msgRows){
+      const paras=[...row.matchAll(paraRe)].map(m=>cleanMessageText(m[1])).filter(t=>t.length);
+      if(!paras.length) continue;
+      const head = row.substring(0,1500);
+      let isAssistant;
+      if(head.includes('pr-11')) isAssistant=true;
+      else if(head.includes('justify-end')||head.includes('items-end')||head.includes('pl-11')) isAssistant=false;
+      else isAssistant=false;
+      if(isAssistant && !detectedCharName){
+        const nm = head.match(/<span>\s*([^<]{2,40})\s*<\/span>/);
+        if(nm) detectedCharName = cleanMessageText(nm[1]);
+      }
+      messageBlocks.push({speaker:isAssistant?'assistant':'user', text:paras.join('\n\n')});
+    }
+  }
+
+  // Legacy fallback (older layout with speaker <span> tags)
+  if(!messageBlocks.length){
+    const speakerPattern=/<span>([^<]+)<\/span>/g;
+    const bad=['Term','Policy','Guidelines','Program','Chat','Upgrade','Current','Continue',
+      'Plan','Setting','Detail','Edit','Memory','Memories','Summarize','Pinned','Unfiltered',
+      'Rec.','Scene','Instruction','Voice','Group','Medium','High','Save','View','8K','Flash',
+      'Gemini','Ultra','DS R','Tau','loaded'];
+    const speakerPositions=[]; let m;
+    while((m=speakerPattern.exec(content))!==null){
+      const sp=m[1].trim();
+      if(bad.some(b=>sp.includes(b))) continue;
+      if(sp.length>80 || sp.length<=2 || /^\d+\/\d+$/.test(sp)) continue;
+      const hasMarkers = sp.includes('\u{1F49C}')||sp.includes('[')||sp.includes("'")||sp.includes('"');
+      const reasonable = sp.length>=3 && sp.length<=40 && /^[A-Z]/.test(sp);
+      if(hasMarkers||reasonable) speakerPositions.push({speaker:sp, at:m.index});
+    }
+    // Most frequent tagged name = the character
+    const freq={};
+    speakerPositions.forEach(s=>{ freq[s.speaker]=(freq[s.speaker]||0)+1; });
+    detectedCharName = Object.keys(freq).sort((a,b)=>freq[b]-freq[a])[0] || '';
+    for(const msgMatch of content.matchAll(paraRe)){
+      let closest=null, dist=Infinity;
+      for(const sp of speakerPositions){
+        if(sp.at<msgMatch.index){
+          const d=msgMatch.index-sp.at;
+          if(d<dist && d<5000){ dist=d; closest=sp.speaker; }
+        }
+      }
+      const text=cleanMessageText(msgMatch[1]);
+      if(!text) continue;
+      const isAssistant = closest && detectedCharName &&
+        (closest.toLowerCase().includes(detectedCharName.toLowerCase()) ||
+         detectedCharName.toLowerCase().includes(closest.toLowerCase()));
+      messageBlocks.push({speaker:isAssistant?'assistant':'user', text});
+    }
+  }
+
+  if(!messageBlocks.length) throw new Error('No messages found — this MHTML layout may not be supported.');
+
+  // Group consecutive same-speaker paragraphs into turns
+  const grouped=[]; let cur=null;
+  for(const b of messageBlocks){
+    if(!cur || cur.speaker!==b.speaker){
+      if(cur) grouped.push(cur);
+      cur={speaker:b.speaker, text:b.text};
+    } else cur.text += '\n\n'+b.text;
+  }
+  if(cur) grouped.push(cur);
+
+  // Build turns in DISPLAY ORDER — no swapping. A leading character greeting
+  // becomes its own turn with an empty user_prompt so everything stays aligned.
+  const turns=[]; let i=0;
+  while(i<grouped.length && grouped[i].speaker==='assistant'){
+    turns.push({user_prompt:'', model_responses:[grouped[i].text]}); i++;
+  }
+  for(;i<grouped.length;i++){
+    const g=grouped[i];
+    if(g.speaker==='user'){
+      const next=grouped[i+1];
+      const reply=(next&&next.speaker==='assistant')?next.text:'';
+      turns.push({user_prompt:g.text, model_responses:reply?[reply]:[]});
+      if(reply) i++;
+    } else if(turns.length){
+      turns[turns.length-1].model_responses.push(g.text);
+    }
+  }
+  return { title, turns, detectedCharName };
+}
+
+/* =====================================================================
+   STAGE 2 — CHECK
+   ===================================================================== */
+let startIdx = 0, endIdx = Infinity;
+
+function startCheck(title, created, turns, fromPicker, names){
+  if(!turns || !turns.length){ say('That file parsed but contained no turns.', true); return; }
+  freshState(title, created, turns);
+  startIdx = 0; endIdx = state.turns.length-1;
+  $('#storyTitle').value = state.title;
+  if(names){ $('#userName').value = names.user || ''; $('#charName').value = names.char || ''; }
+  $('#backToPick').hidden = !fromPicker;
+  renderTurns();
+  goStage(2);
+}
+
+$('#backToPick').onclick = ()=>{ if(bulkChats) openChatPicker(); };
+$('#restart').onclick = ()=>{ if(confirm('Start over? Unsaved edits will be lost.')) location.reload(); };
+$('#storyTitle').oninput = ()=>{ state.title = $('#storyTitle').value; };
+$('#swapNames').onclick = ()=>{
+  const a=$('#userName').value; $('#userName').value=$('#charName').value; $('#charName').value=a;
+  renderTurns();
+};
+$('#userName').addEventListener('change', renderTurns);
+$('#charName').addEventListener('change', renderTurns);
+$('#jumpTo').addEventListener('keypress', e=>{
+  if(e.key==='Enter'){
+    const n=parseInt($('#jumpTo').value);
+    const el=document.getElementById('turn-'+n);
+    if(el){ el.scrollIntoView({behavior:'smooth',block:'start'});
+      el.style.outline='2px solid var(--sage)';
+      setTimeout(()=>el.style.outline='',1800); }
+  }
+});
+$('#toArchive').onclick = ()=>{
+  // carry details forward
+  $('#fmTitle').value = state.title;
+  $('#fmCharacter').value = $('#charName').value.trim();
+  let d = new Date().toISOString().slice(0,10);
+  if(state.created) d = new Date(state.created*1000).toISOString().slice(0,10);
+  if(!$('#fmDate').value) $('#fmDate').value = d;
+  goStage(3);
+};
+$('#backToCheck').onclick = ()=>goStage(2);
+
+function turnIncluded(i){
+  return state.turns[i].included && i>=startIdx && i<=endIdx;
+}
+
+function updateCounts(){
+  const total = state.turns.length;
+  let incl=0, words=0;
+  state.turns.forEach((t,i)=>{
+    if(!turnIncluded(i)) return;
+    incl++;
+    const resp = t.model_responses[t.chosen] || '';
+    words += (t.user_prompt+' '+resp).trim().split(/\s+/).filter(Boolean).length;
+  });
+  $('#cTotal').textContent=total; $('#cIncl').textContent=incl;
+  $('#cWords').textContent=words.toLocaleString('en-GB');
+}
+
+function renderTurns(){
+  const list = $('#turnList');
+  const userN = $('#userName').value.trim() || 'Me';
+  const charN = $('#charName').value.trim() || 'Character';
+  list.innerHTML='';
+  const frag = document.createDocumentFragment();
+
+  state.turns.forEach((t,i)=>{
+    const card = document.createElement('div');
+    card.className='turn'+(turnIncluded(i)?'':' excluded');
+    card.id='turn-'+(i+1);
+
+    let head = `<div class="turn-head"><span class="turn-num">Turn ${i+1}</span>`;
+    if(i===startIdx && startIdx>0) head+=`<span class="marker">Start</span>`;
+    if(i===endIdx && endIdx<state.turns.length-1) head+=`<span class="marker end">End</span>`;
+    head += `<span class="spacer"></span>
+      <button class="btn ghost small" data-act="start" data-i="${i}">Start here</button>
+      <button class="btn ghost small" data-act="end" data-i="${i}">End here</button>
+      <button class="btn ghost small" data-act="tog" data-i="${i}">${t.included?'Leave out':'Put back'}</button>
+      </div>`;
+
+    let body='';
+    if(t.user_prompt || t.editingUser){
+      body += `<div class="msg"><div class="who u">${esc(userN)}
+        <span class="edit-link" data-act="editU" data-i="${i}">edit</span></div>`;
+      body += t.editingUser
+        ? `<textarea lang="en-GB" spellcheck="true" data-bind="user" data-i="${i}">${esc(t.user_prompt)}</textarea>`
+        : `<div class="body">${esc(t.user_prompt)}</div>`;
+      body += `</div>`;
+    }
+    const resp = t.model_responses[t.chosen];
+    if(resp!==undefined){
+      body += `<div class="msg"><div class="who c">${esc(charN)}
+        <span class="edit-link" data-act="editC" data-i="${i}">edit</span></div>`;
+      body += t.editingChar
+        ? `<textarea lang="en-GB" spellcheck="true" data-bind="char" data-i="${i}">${esc(resp)}</textarea>`
+        : `<div class="body">${esc(resp)}</div>`;
+      body += `</div>`;
+    }
+    if(t.model_responses.length>1){
+      body += `<div class="variants"><div class="vlabel">${t.model_responses.length} versions — choose one</div>`;
+      t.model_responses.forEach((v,vi)=>{
+        body += `<label class="variant${vi===t.chosen?' chosen':''}">
+          <input type="radio" name="var-${i}" data-act="pick" data-i="${i}" data-v="${vi}" ${vi===t.chosen?'checked':''}>
+          <span class="vtext">${esc(v.slice(0,260))}${v.length>260?'…':''}</span></label>`;
+      });
+      body += `</div>`;
+    }
+    card.innerHTML = head+body;
+    frag.appendChild(card);
+  });
+  list.appendChild(frag);
+  updateCounts();
+}
+
+$('#turnList').addEventListener('click', e=>{
+  const el = e.target.closest('[data-act]');
+  if(!el) return;
+  const i = Number(el.dataset.i);
+  const act = el.dataset.act;
+  if(act==='start'){ startIdx = i; if(endIdx<startIdx) endIdx=state.turns.length-1; renderTurns(); }
+  else if(act==='end'){ endIdx = i; if(startIdx>endIdx) startIdx=0; renderTurns(); }
+  else if(act==='tog'){ state.turns[i].included = !state.turns[i].included; renderTurns(); }
+  else if(act==='editU'){ state.turns[i].editingUser = !state.turns[i].editingUser; renderTurns(); }
+  else if(act==='editC'){ state.turns[i].editingChar = !state.turns[i].editingChar; renderTurns(); }
+});
+$('#turnList').addEventListener('change', e=>{
+  const el=e.target;
+  if(el.dataset.act==='pick'){
+    const i=Number(el.dataset.i);
+    state.turns[i].chosen = Number(el.dataset.v);
+    renderTurns();
+  }
+});
+$('#turnList').addEventListener('input', e=>{
+  const el=e.target;
+  if(el.dataset.bind==='user') state.turns[Number(el.dataset.i)].user_prompt = el.value;
+  else if(el.dataset.bind==='char'){
+    const t=state.turns[Number(el.dataset.i)];
+    t.model_responses[t.chosen] = el.value;
+  }
+  updateCounts();
+});
+
+/* =====================================================================
+   STAGE 3 — ARCHIVE
+   ===================================================================== */
+
+function exportTurns(){
+  return state.turns.filter((t,i)=>turnIncluded(i));
+}
+
+function frontmatter(){
+  return `---\n`+
+    `title: ${$('#fmTitle').value.trim()}\n`+
+    `character: ${$('#fmCharacter').value.trim()}\n`+
+    `scenario: ${$('#fmScenario').value.trim()}\n`+
+    `tags: ${$('#fmTags').value.trim()}\n`+
+    `status: ${$('#fmStatus').value.trim()||'complete'}\n`+
+    `date: ${$('#fmDate').value||new Date().toISOString().slice(0,10)}\n`+
+    `summary: ${$('#fmSummary').value.trim()}\n`+
+    `---\n\n`;
+}
+
+function storyBody(sep){
+  const userN=($('#userName').value.trim()||'Me').toUpperCase();
+  const charN=($('#charName').value.trim()||'Character').toUpperCase();
+  const turns=exportTurns();
+  let out='';
+  turns.forEach((t,idx)=>{
+    if(t.user_prompt) out += `${userN}:\n${t.user_prompt}\n\n`;
+    const resp=t.model_responses[t.chosen];
+    if(resp) out += `${charN}:\n${resp}\n\n`;
+    if(idx<turns.length-1) out += `${sep}\n\n`;
+  });
+  return out;
+}
+
+function fileBasics(){
+  const title = $('#fmTitle').value.trim() || state.title || 'story';
+  const dateStr = $('#fmDate').value || new Date().toISOString().slice(0,10);
+  return {title, dateStr};
+}
+function download(content, filename, mime){
+  const blob=new Blob([content],{type:mime});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=filename; a.click();
+  URL.revokeObjectURL(url);
+}
+function note(t, cls){ const m=$('#msg3'); m.textContent=t; m.className='msgline '+(cls||''); }
+
+$('#expMd').onclick = ()=>{ const {title,dateStr}=fileBasics();
+  download(frontmatter()+storyBody('* * *'), `${dateStr} - ${title}.md`, 'text/markdown');
+  note('Markdown copy downloaded.','ok'); };
+$('#expTxt').onclick = ()=>{ const {title,dateStr}=fileBasics();
+  download(frontmatter()+storyBody('* * *'), `${dateStr} - ${title}.txt`, 'text/plain');
+  note('Text copy downloaded.','ok'); };
+$('#expJson').onclick = ()=>{ const {title}=fileBasics();
+  const data={ metadata:{ title, creation_timestamp:state.created,
+      character:$('#fmCharacter').value.trim(), scenario:$('#fmScenario').value.trim(),
+      tags:$('#fmTags').value.split(',').map(s=>s.trim()).filter(Boolean),
+      status:$('#fmStatus').value.trim()||'complete', summary:$('#fmSummary').value.trim() },
+    turns: exportTurns().map((t,i)=>({ turn_number:i+1, user_prompt:t.user_prompt,
+      model_response:t.model_responses[t.chosen]||null })) };
+  download(JSON.stringify(data,null,2), `${title.replace(/[^a-z0-9]/gi,'_').toLowerCase()}_extracted.json`,
+    'application/json');
+  note('JSON copy downloaded.','ok'); };
+$('#copyClip').onclick = ()=>{
+  navigator.clipboard.writeText(frontmatter()+storyBody('* * *'))
+    .then(()=>note('Copied to clipboard.','ok'))
+    .catch(err=>note('Could not copy: '+err,'err')); };
+
+/* ---------- seal (identical crypto parameters to the library) ---------- */
+const ITER = 310000;
+const b64 = a=>{ const u=new Uint8Array(a); let s='';
+  for(let i=0;i<u.length;i+=0x8000) s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));
+  return btoa(s); };
+async function deriveKey(pass, salt){
+  const raw = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass),
+    'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2', salt, iterations:ITER, hash:'SHA-256'},
+    raw, {name:'AES-GCM', length:256}, false, ['encrypt']);
+}
+
+$('#sealBtn').onclick = async ()=>{
+  note('');
+  try{
+    if(!window.crypto || !crypto.subtle){
+      note("This browser context can't encrypt. Open the pipeline at its https:// address rather than from a local file.", 'err'); return; }
+    const pass = $('#pass').value;
+    const {title} = fileBasics();
+    if(!title && !$('#fmScenario').value.trim()){ note('Fill in at least a Title or Scenario.','err'); return; }
+    if(pass.length<8){ note('Passphrase needs to be at least 8 characters.','err'); return; }
+    const body = storyBody('* * *').trim();
+    if(!body){ note('There is nothing to seal — every turn is excluded.','err'); return; }
+
+    const story = {
+      title: $('#fmTitle').value.trim(),
+      character: $('#fmCharacter').value.trim(),
+      scenario: $('#fmScenario').value.trim(),
+      tags: $('#fmTags').value.split(',').map(s=>s.trim()).filter(Boolean),
+      status: $('#fmStatus').value.trim() || 'complete',
+      date: $('#fmDate').value || new Date().toISOString().slice(0,10),
+      summary: $('#fmSummary').value.trim(),
+      body
+    };
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv   = crypto.getRandomValues(new Uint8Array(12));
+    const key  = await deriveKey(pass, salt);
+    const ct   = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key,
+      new TextEncoder().encode(JSON.stringify(story)));
+    const pkg = {v:1, salt:b64(salt), iv:b64(iv), ct:b64(ct)};
+
+    const digest = await crypto.subtle.digest('SHA-256',
+      new TextEncoder().encode(story.title + story.date));
+    const short = [...new Uint8Array(digest)].slice(0,3)
+      .map(x=>x.toString(16).padStart(2,'0')).join('');
+    const fname = `story-${short}.json`;
+
+    download(JSON.stringify(pkg), fname, 'application/json');
+    note(`Sealed. Upload ${fname} to the stories/ folder — the shelf updates itself.`, 'ok');
+  }catch(err){
+    note('Something went wrong: '+(err&&err.message?err.message:err), 'err');
+  }
+};
+
+/* ---------- misc ---------- */
+function esc(t){ const d=document.createElement('div'); d.textContent=t==null?'':t; return d.innerHTML; }
+</script>
+</body>
+</html>
