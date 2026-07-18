@@ -164,6 +164,7 @@
   <span class="spacer"></span>
   <a class="link" href="landing.html">Home</a>
   <a class="link active" href="pipeline.html">Pipeline</a>
+  <a class="link" href="pipeline.html#edit" id="editNav">Edit sealed</a>
   <a class="link" href="https://catparky.github.io/the-reading-room/">Library</a>
 </nav>
 
@@ -282,6 +283,8 @@
 
   <div class="sticky" style="border-bottom:none;border-top:1px solid var(--rule);padding-top:.9rem">
     <button class="btn ghost small" id="backToCheck">‹ Back to Check</button>
+    <span style="flex:1"></span>
+    <a href="#edit" id="goEditFromArchive" style="font-family:var(--fm);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--soft);text-decoration:none">Edit a sealed story ›</a>
   </div>
 
   <div class="after">
@@ -289,6 +292,70 @@
     1. Go to the library repository on GitHub and open the <code>stories/</code> folder.<br>
     2. Choose <em>Add file → Upload files</em>, drop the <code>story-XXXXXX.json</code> file in, and commit.<br>
     3. The shelf index rebuilds itself automatically — the story appears within a minute.
+  </div>
+</div>
+
+<!-- ============ STAGE 4 : EDIT SEALED (outside the 1-2-3 flow) ============ -->
+<div class="wrap stage" id="stageEdit">
+  <h1>Edit a <em>sealed</em> story</h1>
+  <p class="sub">Drop an existing library file, enter its passphrase to open it, make
+  your changes, then re-seal. Everything happens in your browser — the file never
+  leaves your machine.</p>
+
+  <div class="panel" id="editOpenPanel">
+    <div class="drop" id="editDrop" style="padding:2rem 1.2rem">
+      <div class="big" style="font-size:1.1rem">Drop a sealed <code>story-XXXXXX.json</code> here</div>
+      <div class="hint">or click to choose</div>
+    </div>
+    <input type="file" id="editFileInput" hidden accept=".json">
+    <div style="margin-top:1rem"><label for="editPass">Passphrase</label>
+      <input type="password" id="editPass" autocomplete="current-password"></div>
+    <div style="margin-top:1rem;display:flex;gap:.7rem;flex-wrap:wrap;align-items:center">
+      <button class="btn" id="editUnseal" disabled>Unseal &amp; open</button>
+      <span class="footer-note" id="editPickedName" style="margin-top:0"></span>
+    </div>
+    <p class="msgline" id="editOpenMsg"></p>
+  </div>
+
+  <div id="editFormPanel" hidden>
+    <div class="panel">
+      <div class="grid2">
+        <div><label for="eTitle">Title</label><input type="text" id="eTitle"></div>
+        <div><label for="eDate">Date</label><input type="date" id="eDate"></div>
+      </div>
+      <div class="grid2" style="margin-top:.9rem">
+        <div><label for="eCharacter">Character</label><input type="text" id="eCharacter"></div>
+        <div><label for="eScenario">Scenario</label><input type="text" id="eScenario"></div>
+      </div>
+      <div class="grid2" style="margin-top:.9rem">
+        <div><label for="eTags">Tags (comma separated)</label><input type="text" id="eTags"></div>
+        <div><label for="eStatus">Status</label><input type="text" id="eStatus"></div>
+      </div>
+      <div style="margin-top:.9rem"><label for="eSummary">Summary</label><input type="text" id="eSummary"></div>
+      <div style="margin-top:.9rem"><label for="eBody">Story text (markdown)</label>
+        <textarea id="eBody" lang="en-GB" spellcheck="true" style="min-height:22rem;font-family:var(--fb);line-height:1.65"></textarea></div>
+    </div>
+
+    <div class="panel">
+      <div class="exports" style="margin-top:0">
+        <button class="btn" id="editReseal">Re-seal &amp; download</button>
+        <button class="btn ghost" id="editCancel">Discard &amp; start over</button>
+      </div>
+      <p class="footer-note" style="margin-top:.6rem">Re-sealed with the same passphrase you unsealed with.</p>
+      <p class="msgline" id="editSaveMsg"></p>
+    </div>
+
+    <div class="after">
+      <b>After downloading the resealed file</b>
+      Upload it back to the <code>stories/</code> folder on GitHub. If the title and
+      date are unchanged, the filename matches and the old file is replaced. If either
+      changed, the filename changes too — remove the old <code>story-XXXXXX.json</code>
+      in the same commit so the shelf doesn't show a duplicate.
+    </div>
+  </div>
+
+  <div class="sticky" style="border-bottom:none;border-top:1px solid var(--rule);padding-top:.9rem">
+    <a href="#" id="backFromEdit" style="font-family:var(--fm);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--soft);text-decoration:none">‹ Back to the pipeline</a>
   </div>
 </div>
 
@@ -318,12 +385,18 @@ function freshState(title, created, turns){
    STAGE HANDLING
    ===================================================================== */
 function goStage(n){
+  // n is 1, 2, 3, or 'edit'
   [1,2,3].forEach(i=>{
     $('#stage'+i).classList.toggle('on', i===n);
     const dot = $('#stepDot'+i);
     dot.classList.toggle('now', i===n);
-    dot.classList.toggle('done', i<n);
-    dot.classList.toggle('clickable', i<n);
+    dot.classList.toggle('done', typeof n==='number' && i<n);
+    dot.classList.toggle('clickable', typeof n==='number' && i<n);
+  });
+  $('#stageEdit').classList.toggle('on', n==='edit');
+  $('#editNav').classList.toggle('active', n==='edit');
+  document.querySelectorAll('.nav a.link').forEach(a=>{
+    if(a.getAttribute('href')==='pipeline.html') a.classList.toggle('active', n!=='edit');
   });
   window.scrollTo({top:0});
 }
@@ -979,6 +1052,151 @@ $('#sealBtn').onclick = async ()=>{
     note(`Sealed. Upload ${fname} to the stories/ folder — the shelf updates itself.`, 'ok');
   }catch(err){
     note('Something went wrong: '+(err&&err.message?err.message:err), 'err');
+  }
+};
+
+/* =====================================================================
+   STAGE 4 — EDIT SEALED
+   ===================================================================== */
+
+const ub64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+let editPickedFile = null;
+let editPassphrase = '';   // held only in memory for re-sealing this session
+
+// Hash-based routing so #edit and the nav link both work
+function checkHash(){
+  if(location.hash === '#edit') goStage('edit');
+}
+window.addEventListener('hashchange', checkHash);
+window.addEventListener('DOMContentLoaded', checkHash);
+
+$('#editNav').addEventListener('click', e=>{ e.preventDefault(); location.hash='#edit'; goStage('edit'); });
+$('#goEditFromArchive').addEventListener('click', e=>{ e.preventDefault(); location.hash='#edit'; goStage('edit'); });
+$('#backFromEdit').addEventListener('click', e=>{
+  e.preventDefault();
+  location.hash='';
+  history.replaceState(null,'',location.pathname);
+  goStage(state ? 3 : 1);
+});
+
+const editDrop = $('#editDrop'), editFileInput = $('#editFileInput');
+editDrop.onclick = ()=>editFileInput.click();
+editDrop.ondragover = e=>{e.preventDefault();editDrop.classList.add('over');};
+editDrop.ondragleave = ()=>editDrop.classList.remove('over');
+editDrop.ondrop = e=>{ e.preventDefault(); editDrop.classList.remove('over');
+  if(e.dataTransfer.files.length) pickEditFile(e.dataTransfer.files[0]); };
+editFileInput.onchange = e=>{ if(e.target.files.length) pickEditFile(e.target.files[0]); };
+
+function pickEditFile(f){
+  editPickedFile = f;
+  $('#editPickedName').textContent = 'Chosen: ' + f.name;
+  $('#editUnseal').disabled = false;
+  editMsg('','',$('#editOpenMsg'));
+}
+
+function editMsg(text, cls, el){ el.textContent = text; el.className = 'msgline '+(cls||''); }
+
+async function deriveKeyRW(pass, salt){
+  const raw = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass),
+    'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2', salt, iterations:ITER, hash:'SHA-256'},
+    raw, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
+}
+
+$('#editUnseal').onclick = async ()=>{
+  const msg = $('#editOpenMsg');
+  editMsg('','',msg);
+  try{
+    if(!editPickedFile){ editMsg('Choose a sealed file first.','err',msg); return; }
+    const pass = $('#editPass').value;
+    if(!pass){ editMsg('Enter the passphrase.','err',msg); return; }
+    const text = await editPickedFile.text();
+    let pkg;
+    try{ pkg = JSON.parse(text); }catch(_){ editMsg('That does not look like a sealed story file (not valid JSON).','err',msg); return; }
+    if(!pkg.salt || !pkg.iv || !pkg.ct){
+      editMsg('That JSON does not have the shape of a sealed story.','err',msg); return;
+    }
+    const key = await deriveKeyRW(pass, ub64(pkg.salt));
+    let pt;
+    try{
+      pt = await crypto.subtle.decrypt({name:'AES-GCM', iv:ub64(pkg.iv)}, key, ub64(pkg.ct));
+    }catch(_){
+      editMsg('Could not open the file with that passphrase.','err',msg); return;
+    }
+    const story = JSON.parse(new TextDecoder().decode(pt));
+    $('#eTitle').value = story.title || '';
+    $('#eDate').value = story.date || '';
+    $('#eCharacter').value = story.character || '';
+    $('#eScenario').value = story.scenario || '';
+    $('#eTags').value = Array.isArray(story.tags) ? story.tags.join(', ') : (story.tags || '');
+    $('#eStatus').value = story.status || 'complete';
+    $('#eSummary').value = story.summary || '';
+    $('#eBody').value = story.body || '';
+    editPassphrase = pass;
+    $('#editOpenPanel').hidden = true;
+    $('#editFormPanel').hidden = false;
+    editMsg('','',$('#editSaveMsg'));
+    window.scrollTo({top:0});
+  }catch(err){
+    editMsg('Something went wrong: '+(err&&err.message?err.message:err),'err',msg);
+  }
+};
+
+$('#editCancel').onclick = ()=>{
+  if(!confirm('Discard your changes and start over?')) return;
+  editPickedFile = null;
+  editPassphrase = '';
+  $('#editPickedName').textContent = '';
+  $('#editUnseal').disabled = true;
+  $('#editPass').value = '';
+  ['eTitle','eDate','eCharacter','eScenario','eTags','eStatus','eSummary','eBody']
+    .forEach(id=>{ $('#'+id).value = id==='eStatus' ? 'complete' : ''; });
+  $('#editOpenPanel').hidden = false;
+  $('#editFormPanel').hidden = true;
+  editMsg('','',$('#editOpenMsg'));
+};
+
+$('#editReseal').onclick = async ()=>{
+  const msg = $('#editSaveMsg');
+  editMsg('','',msg);
+  try{
+    const pass = editPassphrase;
+    if(!pass){ editMsg('Open a sealed file first.','err',msg); return; }
+    if(!$('#eTitle').value.trim() && !$('#eScenario').value.trim()){
+      editMsg('Fill in at least a Title or Scenario.','err',msg); return;
+    }
+    const story = {
+      title: $('#eTitle').value.trim(),
+      character: $('#eCharacter').value.trim(),
+      scenario: $('#eScenario').value.trim(),
+      tags: $('#eTags').value.split(',').map(s=>s.trim()).filter(Boolean),
+      status: $('#eStatus').value.trim() || 'complete',
+      date: $('#eDate').value || new Date().toISOString().slice(0,10),
+      summary: $('#eSummary').value.trim(),
+      body: $('#eBody').value
+    };
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv   = crypto.getRandomValues(new Uint8Array(12));
+    const key  = await deriveKeyRW(pass, salt);
+    const ct   = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key,
+      new TextEncoder().encode(JSON.stringify(story)));
+    const pkg  = {v:1, salt:b64(salt), iv:b64(iv), ct:b64(ct)};
+
+    const digest = await crypto.subtle.digest('SHA-256',
+      new TextEncoder().encode(story.title + story.date));
+    const short = [...new Uint8Array(digest)].slice(0,3)
+      .map(x=>x.toString(16).padStart(2,'0')).join('');
+    const fname = `story-${short}.json`;
+    const origName = editPickedFile ? editPickedFile.name : '';
+    const renamed = origName && origName !== fname;
+
+    download(JSON.stringify(pkg), fname, 'application/json');
+    editMsg(renamed
+      ? `Re-sealed as ${fname}. Filename changed (title or date differs) — remove the old ${origName} in the same commit.`
+      : `Re-sealed as ${fname}. Upload it back to stories/ to overwrite the old one.`,
+      'ok', msg);
+  }catch(err){
+    editMsg('Something went wrong: '+(err&&err.message?err.message:err),'err',msg);
   }
 };
 
